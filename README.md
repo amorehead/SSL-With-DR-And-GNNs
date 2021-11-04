@@ -11,13 +11,12 @@ git clone https://github.com/amorehead/SSL-With-DR-And-GNNs
 
 # Change to project directory:
 cd SSL-With-DR-And-GNNs
-PROJ_DIR=$(pwd)
 
 # Set up Conda environment locally
-conda env create --name SSL-With-DR-And-GNNs -f environment.yml
+conda env create --name DR_SSL -f environment.yml
 
 # Activate Conda environment located in the current directory:
-conda activate SSL-With-DR-And-GNNs
+conda activate DR_SSL
 
 # (Optional) Perform a full install of the pip dependencies described in 'requirements.txt':
 pip3 install -r requirements.txt
