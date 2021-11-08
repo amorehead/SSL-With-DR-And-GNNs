@@ -11,7 +11,6 @@ import torch
 import torch.nn as nn
 # PyTorch Geometric
 import torch_geometric
-import torch_geometric.data as geom_data
 import torch_geometric.nn as geom_nn
 # PL callbacks
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -41,8 +40,9 @@ os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_PATH, exist_ok=True)
 
-# Download Cora dataset
+# Download Cora and Citeseer datasets
 cora_dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora')
+citeseer_dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer')
 
 # Populate list of possible GNN models to use
 gnn_layer_by_name = {"GCN": geom_nn.GCNConv, "GAT": geom_nn.GATConv, "GraphConv": geom_nn.GraphConv}
@@ -197,7 +197,7 @@ class NodeLevelGNN(pl.LightningModule):
         self.log("test_acc", acc)
 
 
-def train_node_classifier(model_name, dataset, **model_kwargs):
+def train_node_classifier(model_name, dataset, fine_tune, **model_kwargs):
     pl.seed_everything(42)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
@@ -215,8 +215,9 @@ def train_node_classifier(model_name, dataset, **model_kwargs):
 
     # Check whether pretrained model exists. If yes, load it and skip training
     pretrained_filename = os.path.join(CHECKPOINT_PATH, "NodeLevel%s.ckpt" % model_name)
-    if os.path.isfile(pretrained_filename):
-        print("Found pretrained model, loading to begin transfer learning...")
+    if os.path.isfile(fine_tune and pretrained_filename):
+        # Currently, fine-tuning is only supported for the Cora dataset since pre-trained models were trained on Cora
+        print("Found pretrained model, loading to begin fine-tuning (e.g., for Cora)...")
         model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
         trainer.fit(model, node_data_loader, node_data_loader)
         model = NodeLevelGNN.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
@@ -247,15 +248,34 @@ def print_results(result_dict):
     print("Test accuracy:  %4.2f%%" % (100.0 * result_dict["test"]))
 
 
+# Train, validate, and test on the Cora dataset
 node_mlp_model, node_mlp_result = train_node_classifier(
-    model_name="MLP", dataset=cora_dataset, c_hidden=16, num_layers=2, dp_rate=0.1
+    model_name="MLP", dataset=cora_dataset, fine_tune=True,
+    c_hidden=16, num_layers=2, dp_rate=0.1
 )
 
 print(f'\nSemi-supervised node classification results on the Cora dataset using an MLP:')
 print_results(node_mlp_result)
 
 node_gnn_model, node_gnn_result = train_node_classifier(
-    model_name="GNN", layer_name="GCN", dataset=cora_dataset, c_hidden=16, num_layers=2, dp_rate=0.1
+    model_name="GNN", layer_name="GCN", dataset=cora_dataset,
+    fine_tune=True, c_hidden=16, num_layers=2, dp_rate=0.1
 )
 print(f'\nSemi-supervised node classification results on the Cora dataset using a GNN:')
+print_results(node_gnn_result)
+
+# Train, validate, and test on the Citeseer dataset
+node_mlp_model, node_mlp_result = train_node_classifier(
+    model_name="MLP", dataset=citeseer_dataset,
+    fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
+)
+
+print(f'\nSemi-supervised node classification results on the CiteSeer dataset using an MLP:')
+print_results(node_mlp_result)
+
+node_gnn_model, node_gnn_result = train_node_classifier(
+    model_name="GNN", layer_name="GCN", dataset=citeseer_dataset,
+    fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
+)
+print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GNN:')
 print_results(node_gnn_result)
