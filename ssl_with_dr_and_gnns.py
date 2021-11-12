@@ -261,7 +261,21 @@ node_gnn_model, node_gnn_result = train_node_classifier(
     model_name="GNN", layer_name="GCN", dataset=cora_dataset,
     fine_tune=True, c_hidden=16, num_layers=2, dp_rate=0.1
 )
-print(f'\nSemi-supervised node classification results on the Cora dataset using a GNN:')
+print(f'\nSemi-supervised node classification results on the Cora dataset using a GCN:')
+print_results(node_gnn_result)
+
+node_gnn_model, node_gnn_result = train_node_classifier(
+    model_name="GNN", layer_name="GAT", dataset=cora_dataset,
+    fine_tune=True, c_hidden=16, num_layers=2, dp_rate=0.1
+)
+print(f'\nSemi-supervised node classification results on the Cora dataset using a GAT:')
+print_results(node_gnn_result)
+
+node_gnn_model, node_gnn_result = train_node_classifier(
+    model_name="GNN", layer_name="GraphConv", dataset=cora_dataset,
+    fine_tune=True, c_hidden=16, num_layers=2, dp_rate=0.1
+)
+print(f'\nSemi-supervised node classification results on the Cora dataset using a GraphConv:')
 print_results(node_gnn_result)
 
 # Train, validate, and test on the Citeseer dataset
@@ -277,5 +291,19 @@ node_gnn_model, node_gnn_result = train_node_classifier(
     model_name="GNN", layer_name="GCN", dataset=citeseer_dataset,
     fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
 )
-print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GNN:')
+print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GCN:')
+print_results(node_gnn_result)
+
+node_gnn_model, node_gnn_result = train_node_classifier(
+    model_name="GNN", layer_name="GAT", dataset=citeseer_dataset,
+    fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
+)
+print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GAT:')
+print_results(node_gnn_result)
+
+node_gnn_model, node_gnn_result = train_node_classifier(
+    model_name="GNN", layer_name="GraphConv", dataset=citeseer_dataset,
+    fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
+)
+print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GraphConv:')
 print_results(node_gnn_result)
