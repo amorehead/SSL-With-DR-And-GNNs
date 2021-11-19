@@ -14,6 +14,7 @@ import torch_geometric
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from models import GNNModel, MLPModel, NodeLevelGNN
+from utils import print_results
 
 AVAIL_GPUS = min(1, torch.cuda.device_count())
 BATCH_SIZE = 256 if AVAIL_GPUS else 64
@@ -103,15 +104,6 @@ def train_node_classifier(model_name, dataset, fine_tune, **model_kwargs):
     _, val_acc = model.forward(batch, mode="val")
     result = {"train": train_acc, "val": val_acc, "test": test_result[0]["test_acc"]}
     return model, result
-
-
-# Small function for printing the test scores
-def print_results(result_dict):
-    if "train" in result_dict:
-        print("Train accuracy: %4.2f%%" % (100.0 * result_dict["train"]))
-    if "val" in result_dict:
-        print("Val accuracy:   %4.2f%%" % (100.0 * result_dict["val"]))
-    print("Test accuracy:  %4.2f%%" % (100.0 * result_dict["test"]))
 
 
 # Train, validate, and test on the Cora dataset
