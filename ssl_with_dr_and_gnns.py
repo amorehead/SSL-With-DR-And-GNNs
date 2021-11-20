@@ -1,8 +1,5 @@
 # Standard libraries
 import os
-# For downloading pre-trained models
-import urllib.request
-from urllib.error import HTTPError
 
 # PyTorch Lightning
 import pytorch_lightning as pl
@@ -13,8 +10,8 @@ import torch_geometric
 # PL callbacks
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from models import GNNModel, MLPModel, NodeLevelGNN
-from utils import print_results
+from models import NodeLevelGNN
+from utils import print_results, download_pretrained_weights
 
 AVAIL_GPUS = min(1, torch.cuda.device_count())
 BATCH_SIZE = 256 if AVAIL_GPUS else 64
@@ -32,11 +29,6 @@ pl.seed_everything(42)
 torch.backends.cudnn.determinstic = True
 torch.backends.cudnn.benchmark = False
 
-# Github URL where saved models are stored for this tutorial
-base_url = "https://raw.githubusercontent.com/phlippe/saved_models/main/tutorial7/"
-# Files to download
-pretrained_files = ["NodeLevelMLP.ckpt", "NodeLevelGNN.ckpt", "GraphLevelGraphConv.ckpt"]
-
 # Create checkpoint path if it doesn't exist yet
 os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
@@ -46,22 +38,11 @@ os.makedirs(CHECKPOINT_PATH, exist_ok=True)
 cora_dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora')
 citeseer_dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer')
 
-# For each file, check whether it already exists. If not, try downloading it.
-for file_name in pretrained_files:
-    file_path = os.path.join(CHECKPOINT_PATH, file_name)
-    if "/" in file_name:
-        os.makedirs(file_path.rsplit("/", 1)[0], exist_ok=True)
-    if not os.path.isfile(file_path):
-        file_url = base_url + file_name
-        print("Downloading %s..." % file_url)
-        try:
-            urllib.request.urlretrieve(file_url, file_path)
-        except HTTPError as e:
-            print(
-                "Something went wrong. Please try to download the file from the GDrive folder,"
-                " or contact the author with the full output including the following error:\n",
-                e,
-            )
+# Github URL where saved models are stored for this tutorial
+base_url = "https://raw.githubusercontent.com/phlippe/saved_models/main/tutorial7/"
+# Files to download
+pretrained_files = ["NodeLevelMLP.ckpt", "NodeLevelGNN.ckpt", "GraphLevelGraphConv.ckpt"]
+# e = download_pretrained_weights(exist_ok, CHECKPOINT_PATH, base_url, pretrained_files)
 
 
 def train_node_classifier(model_name, dataset, fine_tune, **model_kwargs):
@@ -86,15 +67,13 @@ def train_node_classifier(model_name, dataset, fine_tune, **model_kwargs):
         # Currently, fine-tuning is only supported for the Cora dataset since pre-trained models were trained on Cora
         print("Found pretrained model, loading to begin fine-tuning (e.g., for Cora)...")
         model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
-        trainer.fit(model, node_data_loader, node_data_loader)
-        model = NodeLevelGNN.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
     else:
         pl.seed_everything()
         model = NodeLevelGNN(
             model_name=model_name, c_in=dataset.num_node_features, c_out=dataset.num_classes, **model_kwargs
         )
-        trainer.fit(model, node_data_loader, node_data_loader)
-        model = NodeLevelGNN.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
+    trainer.fit(model, node_data_loader, node_data_loader)
+    model = NodeLevelGNN.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
 
     # Test best model on the test set
     test_result = trainer.test(model, test_dataloaders=node_data_loader, verbose=False)
@@ -106,14 +85,15 @@ def train_node_classifier(model_name, dataset, fine_tune, **model_kwargs):
     return model, result
 
 
-# Train, validate, and test on the Cora dataset
-node_mlp_model, node_mlp_result = train_node_classifier(
-    model_name="MLP", dataset=cora_dataset, fine_tune=True,
-    c_hidden=16, num_layers=2, dp_rate=0.1
-)
+# Train, validate, and test on the Cora dataset -------------------------------
 
-print(f'\nSemi-supervised node classification results on the Cora dataset using an MLP:')
-print_results(node_mlp_result)
+# node_mlp_model, node_mlp_result = train_node_classifier(
+#     model_name="MLP", dataset=cora_dataset, fine_tune=True,
+#     c_hidden=16, num_layers=2, dp_rate=0.1
+# )
+
+# print(f'\nSemi-supervised node classification results on the Cora dataset using an MLP:')
+# print_results(node_mlp_result)
 
 node_gnn_model, node_gnn_result = train_node_classifier(
     model_name="GNN", layer_name="GCN", dataset=cora_dataset,
@@ -122,46 +102,47 @@ node_gnn_model, node_gnn_result = train_node_classifier(
 print(f'\nSemi-supervised node classification results on the Cora dataset using a GCN:')
 print_results(node_gnn_result)
 
-node_gnn_model, node_gnn_result = train_node_classifier(
-    model_name="GNN", layer_name="GAT", dataset=cora_dataset,
-    fine_tune=True, c_hidden=16, num_layers=2, dp_rate=0.1
-)
-print(f'\nSemi-supervised node classification results on the Cora dataset using a GAT:')
-print_results(node_gnn_result)
+# node_gnn_model, node_gnn_result = train_node_classifier(
+#     model_name="GNN", layer_name="GAT", dataset=cora_dataset,
+#     fine_tune=True, c_hidden=16, num_layers=2, dp_rate=0.1
+# )
+# print(f'\nSemi-supervised node classification results on the Cora dataset using a GAT:')
+# print_results(node_gnn_result)
 
-node_gnn_model, node_gnn_result = train_node_classifier(
-    model_name="GNN", layer_name="GraphConv", dataset=cora_dataset,
-    fine_tune=True, c_hidden=16, num_layers=2, dp_rate=0.1
-)
-print(f'\nSemi-supervised node classification results on the Cora dataset using a GraphConv:')
-print_results(node_gnn_result)
+# node_gnn_model, node_gnn_result = train_node_classifier(
+#     model_name="GNN", layer_name="GraphConv", dataset=cora_dataset,
+#     fine_tune=True, c_hidden=16, num_layers=2, dp_rate=0.1
+# )
+# print(f'\nSemi-supervised node classification results on the Cora dataset using a GraphConv:')
+# print_results(node_gnn_result)
 
-# Train, validate, and test on the Citeseer dataset
-node_mlp_model, node_mlp_result = train_node_classifier(
-    model_name="MLP", dataset=citeseer_dataset,
-    fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
-)
+# Train, validate, and test on the Citeseer dataset ---------------------------
 
-print(f'\nSemi-supervised node classification results on the CiteSeer dataset using an MLP:')
-print_results(node_mlp_result)
+# node_mlp_model, node_mlp_result = train_node_classifier(
+#     model_name="MLP", dataset=citeseer_dataset,
+#     fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
+# )
 
-node_gnn_model, node_gnn_result = train_node_classifier(
-    model_name="GNN", layer_name="GCN", dataset=citeseer_dataset,
-    fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
-)
-print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GCN:')
-print_results(node_gnn_result)
+# print(f'\nSemi-supervised node classification results on the CiteSeer dataset using an MLP:')
+# print_results(node_mlp_result)
 
-node_gnn_model, node_gnn_result = train_node_classifier(
-    model_name="GNN", layer_name="GAT", dataset=citeseer_dataset,
-    fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
-)
-print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GAT:')
-print_results(node_gnn_result)
+# node_gnn_model, node_gnn_result = train_node_classifier(
+#     model_name="GNN", layer_name="GCN", dataset=citeseer_dataset,
+#     fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
+# )
+# print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GCN:')
+# print_results(node_gnn_result)
 
-node_gnn_model, node_gnn_result = train_node_classifier(
-    model_name="GNN", layer_name="GraphConv", dataset=citeseer_dataset,
-    fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
-)
-print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GraphConv:')
-print_results(node_gnn_result)
+# node_gnn_model, node_gnn_result = train_node_classifier(
+#     model_name="GNN", layer_name="GAT", dataset=citeseer_dataset,
+#     fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
+# )
+# print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GAT:')
+# print_results(node_gnn_result)
+
+# node_gnn_model, node_gnn_result = train_node_classifier(
+#     model_name="GNN", layer_name="GraphConv", dataset=citeseer_dataset,
+#     fine_tune=False, c_hidden=16, num_layers=2, dp_rate=0.1
+# )
+# print(f'\nSemi-supervised node classification results on the CiteSeer dataset using a GraphConv:')
+# print_results(node_gnn_result)
