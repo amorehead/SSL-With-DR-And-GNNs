@@ -20,10 +20,9 @@ BASE_URL = '.'
 DATASET_PATH = f'{BASE_URL}/data/'
 # Path to the folder where the pretrained models are saved
 CHECKPOINT_BASE_PATH = f'{BASE_URL}/savedmodels/'
-CHECKPOINT_PATH = os.path.join(CHECKPOINT_BASE_PATH, "GNNs/")
 
 # Setting the seed
-pl.seed_everything(42)
+pl.seed_everything(8735)
 
 # Ensure that all operations are deterministic on GPU (if used) for reproducibility
 torch.backends.cudnn.determinstic = True
@@ -32,46 +31,39 @@ torch.backends.cudnn.benchmark = False
 # Create checkpoint path if it doesn't exist yet
 os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
-os.makedirs(CHECKPOINT_PATH, exist_ok=True)
 
 datasets = {
     'cora': torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora'),
     'citeseer': torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer'),
 }
 
-# Github URL where saved models are stored for this tutorial
-base_url = "https://raw.githubusercontent.com/phlippe/saved_models/main/tutorial7/"
-# Files to download
-pretrained_files = ["NodeLevelMLP.ckpt", "NodeLevelGNN.ckpt", "GraphLevelGraphConv.ckpt"]
-# e = download_pretrained_weights(exist_ok, CHECKPOINT_PATH, base_url, pretrained_files)
-
 
 def train_node_classifier(model_name, dataset_name, fine_tune, max_epochs, **model_kwargs):
-    pl.seed_everything(42)
+    pl.seed_everything(8735)
     dataset = datasets[dataset_name]
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Create a PyTorch Lightning trainer
     experiment_name = f'{dataset_name}-{model_name}'
-    root_dir = os.path.join(CHECKPOINT_PATH, experiment_name)
+    root_dir = os.path.join(CHECKPOINT_BASE_PATH, experiment_name)
     os.makedirs(root_dir, exist_ok=True)
     trainer = pl.Trainer(
         default_root_dir=root_dir,
         callbacks=[ModelCheckpoint(save_weights_only=True, mode="max", monitor="val_acc")],
         gpus=AVAIL_GPUS,
         max_epochs=max_epochs,
-        progress_bar_refresh_rate=0
+        progress_bar_refresh_rate=1
     )  # 0 because epoch size is 1
     trainer.logger._default_hp_metric = None  # Optional logging argument that we don't need
 
     # Check whether pretrained model exists. If yes, load it and skip training
-    pretrained_filename = os.path.join(CHECKPOINT_PATH, f'{experiment_name}.ckpt')
+    pretrained_filename = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
     if os.path.isfile(fine_tune and pretrained_filename):
         # Currently, fine-tuning is only supported for the Cora dataset since pre-trained models were trained on Cora
         print("Found pretrained model, loading to begin fine-tuning")
         model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
     else:
-        pl.seed_everything()
+        pl.seed_everything(8735)
         model = NodeLevelGNN(
             model_name=model_name, c_in=dataset.num_node_features, c_out=dataset.num_classes, **model_kwargs
         )
@@ -87,6 +79,27 @@ def train_node_classifier(model_name, dataset_name, fine_tune, max_epochs, **mod
     result = {"train": train_acc, "val": val_acc, "test": test_result[0]["test_acc"]}
     return model, result
 
+def extract_hidden_features(dataset_name, model_name, **model_kwargs):
+    pl.seed_everything(8735)
+    dataset = datasets[dataset_name]
+    node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
+
+    # Check whether pretrained model exists.
+    experiment_name = f'{dataset_name}-{model_name}'
+    pretrained_filename = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
+    if os.path.isfile(pretrained_filename):
+        print("Found pretrained model, loading...")
+        model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
+    else:
+        raise IOError("NOT found the pretrained model", pretrained_filename)
+
+    # Test best model on the test set
+    batch = next(iter(node_data_loader))
+    batch = batch.to(model.device)
+    hidden_features = model.extract_features(batch).detach().numpy()
+    labels = batch.y.detach().numpy()
+    return hidden_features, labels
+
 
 def train(dataset_name, model_name, max_epochs=500):
     node_mlp_model, node_mlp_result = train_node_classifier(
@@ -98,6 +111,9 @@ def train(dataset_name, model_name, max_epochs=500):
     print_results(node_mlp_result)
 
 if __name__ == '__main__':
-    dataset_name = 'citeseer' # 'cora', 'citeseer',
-    model_name = 'MLP' # 'MLP', 'GCN', 'GAT', 'GraphConv'
-    train(dataset_name, model_name, max_epochs=15000)
+    # dataset_name = 'citeseer' # 'cora', 'citeseer',
+    # model_name = 'GCN' # 'MLP', 'GCN', 'GAT', 'GraphConv'
+    # train(dataset_name, model_name, max_epochs=15000)
+    for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
+        for dataset_name in ['cora', 'citeseer']:
+            train(dataset_name, model_name, max_epochs=15000)
