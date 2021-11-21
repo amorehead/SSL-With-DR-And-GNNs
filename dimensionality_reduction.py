@@ -47,6 +47,7 @@ pretrained_files = ["NodeLevelMLP.ckpt", "NodeLevelGNN.ckpt", "GraphLevelGraphCo
 
 import umap
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -86,6 +87,9 @@ def project_2d(method, data, **kwargs):
     elif method == 'umap':
         reducer = umap.UMAP(random_state=8735)
         embedding = reducer.fit_transform(data)
+    elif method == 'pca':
+        pca = PCA(n_components=kwargs.get('n_components', 2))
+        embedding = pca.fit_transform(data)
     else:
         raise ValueError('invalid method', method)
     return embedding
@@ -132,7 +136,7 @@ if __name__ == '__main__':
         'tsne': {
             'n_components': 2,
         },
-        'umap': {
-        }
+        'umap': {},
+        'pca': {},
     }
     main('GNN', 'cora', methods)
