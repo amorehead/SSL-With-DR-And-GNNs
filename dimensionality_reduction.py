@@ -33,8 +33,10 @@ os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_PATH, exist_ok=True)
 
 # Download Cora and Citeseer datasets
-cora_dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora')
-citeseer_dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer')
+datasets = {
+    'cora': torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora'),
+    'citeseer': torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer'),
+}
 
 # Github URL where saved models are stored for this tutorial
 base_url = "https://raw.githubusercontent.com/phlippe/saved_models/main/tutorial7/"
@@ -43,6 +45,7 @@ pretrained_files = ["NodeLevelMLP.ckpt", "NodeLevelGNN.ckpt", "GraphLevelGraphCo
 # e = download_pretrained_weights(exist_ok, CHECKPOINT_PATH, base_url, pretrained_files)
 
 
+import umap
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -53,38 +56,15 @@ result_dir = RESULT_DIR_NAME
 if not os.path.exists(result_dir):
     os.makedirs(result_dir)
 
-def plot_tsne_2d(data, labels, save_path, n_components=2):
-    tsne = TSNE(n_components=n_components, init='pca', perplexity=40, random_state=0)
-    tsne_res = tsne.fit_transform(data)
 
-    v = pd.DataFrame(data,columns=[str(i) for i in range(data.shape[1])])
-    v['y'] = labels
-    v['label'] = v['y'].apply(lambda i: str(i))
-    v["t1"] = tsne_res[:,0]
-    v["t2"] = tsne_res[:,1]
-
-    sns.scatterplot(
-        x="t1", y="t2",
-        hue="y",
-        palette=sns.color_palette(["#52D1DC", "#8D0004", "#845218","#563EAA", "#E44658", "#63C100", "#FF7800"]),
-        legend=False,
-        data=v,
-    )
-    plt.xticks([])
-    plt.yticks([])
-    plt.xlabel('') 
-    plt.ylabel('')
-    plt.savefig(save_path, dpi=300)
-
-
-def visualize_hidden_space(model_name, dataset, result_dir, **model_kwargs):
+def extract_hidden_features(model_name, dataset, result_dir, **model_kwargs):
     pl.seed_everything(42)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Check whether pretrained model exists.
     pretrained_filename = os.path.join(CHECKPOINT_PATH, "NodeLevel%s.ckpt" % model_name)
     if os.path.isfile(pretrained_filename):
-        print("Found pretrained model, loading to begin fine-tuning (e.g., for Cora)...")
+        print("Found pretrained model, loading...")
         model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
     else:
         raise IOError("NOT found the pretrained model", pretrained_filename)
@@ -93,14 +73,66 @@ def visualize_hidden_space(model_name, dataset, result_dir, **model_kwargs):
     batch = next(iter(node_data_loader))
     batch = batch.to(model.device)
     hidden_features = model.extract_features(batch).detach().numpy()
-    save_path = os.path.join(result_dir, model_name + '-tsne.png')
-    viz_result = plot_tsne_2d(hidden_features, batch.y.detach().numpy(), save_path)
-    return model, viz_result
+    return model, hidden_features, batch.y.detach().numpy()
 
+def plot_hidden_features(method, data, labels, title, save_path, **kwargs):
+    embedding = project_2d(method, data, **kwargs)
+    fig = plot_embedding_2d(data, labels, embedding, title, save_path)
 
-node_gnn_model, node_gnn_result = visualize_hidden_space(
-    model_name="GNN", layer_name="GCN", dataset=cora_dataset,
-    result_dir=result_dir,
-    c_hidden=16, num_layers=2, dp_rate=0.1
-)
-print(f'\nSemi-supervised node classification results on the Cora dataset using a GCN:')
+def project_2d(method, data, **kwargs):
+    if method == 'tsne':
+        tsne = TSNE(n_components=kwargs.get('n_components', 2), init='pca', perplexity=40, random_state=0)
+        embedding = tsne.fit_transform(data)
+    elif method == 'umap':
+        reducer = umap.UMAP(random_state=8735)
+        embedding = reducer.fit_transform(data)
+    else:
+        raise ValueError('invalid method', method)
+    return embedding
+
+def plot_embedding_2d(data, labels, embedding, title, save_path):
+    v = pd.DataFrame(data, columns=[str(i) for i in range(data.shape[1])])
+    v['y'] = labels
+    v['label'] = v['y'].apply(lambda i: str(i))
+    v["t1"] = embedding[:,0]
+    v["t2"] = embedding[:,1]
+
+    fig, ax = plt.subplots()
+    sns.scatterplot(
+        x="t1", y="t2",
+        hue="y",
+        palette=sns.color_palette(["#52D1DC", "#8D0004", "#845218","#563EAA", "#E44658", "#63C100", "#FF7800"]),
+        legend=True,
+        data=v,
+        ax=ax,
+    )
+    plt.xticks([])
+    plt.yticks([])
+    plt.xlabel('') 
+    plt.ylabel('')
+    plt.title(title)
+    plt.savefig(save_path, dpi=300)
+    return fig
+
+def main(model_name, dataset_name, methods, **kwargs):
+    node_gnn_model, hidden_features, labels = extract_hidden_features(
+        model_name=model_name, layer_name="GCN", dataset=datasets[dataset_name],
+        result_dir=result_dir,
+        c_hidden=16, num_layers=2, dp_rate=0.1
+    )
+    for method_name in methods:
+        kwargs = methods[method_name]
+        title = f'{method_name} projection of {model_name} on {dataset_name}'
+        save_path = os.path.join(result_dir, f'{dataset_name}-{model_name}-{method_name}.png')
+        viz_result = plot_hidden_features(method_name, hidden_features, labels, title, save_path, **kwargs)
+        print(f'Visualizing hidden features of a GCN on the {dataset_name} dataset: {method_name}')
+
+if __name__ == '__main__':
+    methods = {
+        'tsne': {
+            'n_components': 2,
+        },
+        'umap': {
+        }
+    }
+    main('GNN', 'cora', methods)

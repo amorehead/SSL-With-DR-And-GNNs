@@ -12,5 +12,6 @@ dependencies:
   - torchvision==0.10.0
   - cudatoolkit==11.1.1
   - pyg==2.0.2
+  - umap-learn==0.5.2
   - pip:
       - -r requirements.txt
