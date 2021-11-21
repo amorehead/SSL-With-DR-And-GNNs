@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch_geometric.nn as geom_nn
 
 # Populate list of possible GNN models to use
-gnn_layer_by_name = {"GCN": geom_nn.GCNConv, "GAT": geom_nn.GATConv, "GraphConv": geom_nn.GraphConv}
+gnn_layer_by_name = {"MLP": nn.Linear, "GCN": geom_nn.GCNConv, "GAT": geom_nn.GATConv, "GraphConv": geom_nn.GraphConv}
 
 class GNNModel(nn.Module):
     def __init__(
@@ -16,7 +16,7 @@ class GNNModel(nn.Module):
             c_hidden,
             c_out,
             num_layers=2,
-            layer_name="GCN",
+            model_name="GCN",
             dp_rate=0.1,
             **kwargs,
     ):
@@ -26,24 +26,24 @@ class GNNModel(nn.Module):
             c_hidden: Dimension of hidden features
             c_out: Dimension of the output features. Usually number of classes in classification
             num_layers: Number of "hidden" graph layers
-            layer_name: String of the graph layer to use
+            model_name: String of the graph layer to use
             dp_rate: Dropout rate to apply throughout the network
             kwargs: Additional arguments for the graph layer (e.g. number of heads for GAT)
         """
         super().__init__()
-        gnn_layer = gnn_layer_by_name[layer_name]
+        gnn_layer = gnn_layer_by_name[model_name]
 
         hidden_layers = []
         in_channels, out_channels = c_in, c_hidden
         for l_idx in range(num_layers - 1):
             hidden_layers += [
-                gnn_layer(in_channels=in_channels, out_channels=out_channels, **kwargs),
+                gnn_layer(in_channels, out_channels, **kwargs),
                 nn.ReLU(inplace=True),
                 nn.Dropout(dp_rate),
             ]
             in_channels = c_hidden
         self.hidden_layers = nn.ModuleList(hidden_layers)
-        self.out_layers = nn.ModuleList([gnn_layer(in_channels=in_channels, out_channels=c_out, **kwargs)])
+        self.out_layers = nn.ModuleList([gnn_layer(in_channels, c_out, **kwargs)])
     
     def extract_features(self, x, edge_index):
         """
@@ -76,43 +76,13 @@ class GNNModel(nn.Module):
         return x
 
 
-class MLPModel(nn.Module):
-    def __init__(self, c_in, c_hidden, c_out, num_layers=2, dp_rate=0.1):
-        """
-        Args:
-            c_in: Dimension of input features
-            c_hidden: Dimension of hidden features
-            c_out: Dimension of the output features. Usually number of classes in classification
-            num_layers: Number of hidden layers
-            dp_rate: Dropout rate to apply throughout the network
-        """
-        super().__init__()
-        layers = []
-        in_channels, out_channels = c_in, c_hidden
-        for l_idx in range(num_layers - 1):
-            layers += [nn.Linear(in_channels, out_channels), nn.ReLU(inplace=True), nn.Dropout(dp_rate)]
-            in_channels = c_hidden
-        layers += [nn.Linear(in_channels, c_out)]
-        self.layers = nn.Sequential(*layers)
-
-    def forward(self, x, *args, **kwargs):
-        """
-        Args:
-            x: Input features per node
-        """
-        return self.layers(x)
-
-
 class NodeLevelGNN(pl.LightningModule):
-    def __init__(self, model_name, **model_kwargs):
+    def __init__(self, **model_kwargs):
         super().__init__()
         # Saving hyperparameters
         self.save_hyperparameters()
 
-        if model_name == "MLP":
-            self.model = MLPModel(**model_kwargs)
-        else:
-            self.model = GNNModel(**model_kwargs)
+        self.model = GNNModel(**model_kwargs)
         self.loss_module = nn.CrossEntropyLoss()
 
     def forward(self, data, mode="train"):

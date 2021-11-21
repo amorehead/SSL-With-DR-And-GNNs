@@ -32,7 +32,6 @@ os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_PATH, exist_ok=True)
 
-# Download Cora and Citeseer datasets
 datasets = {
     'cora': torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora'),
     'citeseer': torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer'),
@@ -52,13 +51,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-RESULT_DIR_NAME = 'results'
-result_dir = RESULT_DIR_NAME
-if not os.path.exists(result_dir):
-    os.makedirs(result_dir)
+RESULT_DIR = os.path.join('results')
+os.makedirs(RESULT_DIR, exist_ok=True)
 
 
-def extract_hidden_features(model_name, dataset, result_dir, **model_kwargs):
+def extract_hidden_features(model_name, dataset, **model_kwargs):
     pl.seed_everything(42)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
@@ -118,18 +115,17 @@ def plot_embedding_2d(data, labels, embedding, title, save_path):
     plt.savefig(save_path, dpi=300)
     return fig
 
-def main(model_name, dataset_name, methods, **kwargs):
+def main(dataset_name, model_name, methods, **kwargs):
     node_gnn_model, hidden_features, labels = extract_hidden_features(
-        model_name=model_name, layer_name="GCN", dataset=datasets[dataset_name],
-        result_dir=result_dir,
+        model_name=model_name, dataset=datasets[dataset_name],
         c_hidden=16, num_layers=2, dp_rate=0.1
     )
     for method_name in methods:
         kwargs = methods[method_name]
         title = f'{method_name} projection of {model_name} on {dataset_name}'
-        save_path = os.path.join(result_dir, f'{dataset_name}-{model_name}-{method_name}.png')
+        save_path = os.path.join(RESULT_DIR, f'{dataset_name}-{model_name}-{method_name}.png')
         viz_result = plot_hidden_features(method_name, hidden_features, labels, title, save_path, **kwargs)
-        print(f'Visualizing hidden features of a GCN on the {dataset_name} dataset: {method_name}')
+        print(f'Visualizing hidden features of the {model_name} on the {dataset_name} dataset: {method_name}')
 
 if __name__ == '__main__':
     methods = {
@@ -139,4 +135,6 @@ if __name__ == '__main__':
         'umap': {},
         'pca': {},
     }
-    main('GNN', 'cora', methods)
+    dataset_name = 'cora' # 'cora', 'citeseer',
+    model_name = 'MLP' # 'MLP', 'GCN', 'GAT', 'GraphConv'
+    main(dataset_name, model_name, methods)
