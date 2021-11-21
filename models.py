@@ -9,6 +9,7 @@ import torch_geometric.nn as geom_nn
 # Populate list of possible GNN models to use
 gnn_layer_by_name = {"MLP": nn.Linear, "GCN": geom_nn.GCNConv, "GAT": geom_nn.GATConv, "GraphConv": geom_nn.GraphConv}
 
+
 class GNNModel(nn.Module):
     def __init__(
             self,
@@ -44,7 +45,7 @@ class GNNModel(nn.Module):
             in_channels = c_hidden
         self.hidden_layers = nn.ModuleList(hidden_layers)
         self.out_layers = nn.ModuleList([gnn_layer(in_channels, c_out, **kwargs)])
-    
+
     def extract_features(self, x, edge_index):
         """
         Args:
@@ -102,7 +103,7 @@ class NodeLevelGNN(pl.LightningModule):
         loss = self.loss_module(x[mask], data.y[mask])
         acc = (x[mask].argmax(dim=-1) == data.y[mask]).sum().float() / mask.sum()
         return loss, acc
-    
+
     def extract_features(self, data):
         x, edge_index = data.x, data.edge_index
         x = self.model.extract_features(x, edge_index)

@@ -11,7 +11,7 @@ import torch_geometric
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from models import NodeLevelGNN
-from utils import print_results, download_pretrained_weights
+from utils import print_results
 
 AVAIL_GPUS = min(1, torch.cuda.device_count())
 BATCH_SIZE = 256 if AVAIL_GPUS else 64
@@ -79,6 +79,7 @@ def train_node_classifier(model_name, dataset_name, fine_tune, max_epochs, **mod
     result = {"train": train_acc, "val": val_acc, "test": test_result[0]["test_acc"]}
     return model, result
 
+
 def extract_hidden_features(dataset_name, model_name, **model_kwargs):
     pl.seed_everything(8735)
     dataset = datasets[dataset_name]
@@ -109,6 +110,7 @@ def train(dataset_name, model_name, max_epochs=500):
 
     print(f'\nSemi-supervised node classification results on the {dataset_name} dataset using an {model_name}:')
     print_results(node_mlp_result)
+
 
 if __name__ == '__main__':
     # dataset_name = 'citeseer' # 'cora', 'citeseer',
