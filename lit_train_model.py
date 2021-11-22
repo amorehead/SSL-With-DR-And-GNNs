@@ -1,5 +1,6 @@
 # Standard libraries
 import os
+import shutil
 
 # PyTorch Lightning
 import pytorch_lightning as pl
@@ -11,9 +12,9 @@ import torch_geometric
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 # Project utilities
-from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, DATASETS, AVAIL_GPUS, RAND_SEED
+from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, AVAIL_GPUS, RAND_SEED
 from models import NodeLevelGNN
-from utils import print_results
+from utils import get_experiment_name, get_dataset, print_results
 
 # Setting the seed
 pl.seed_everything(RAND_SEED)
@@ -27,13 +28,14 @@ os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 
 
-def train_node_classifier(model_name, dataset_name, fine_tune, max_epochs, **model_kwargs):
-    pl.seed_everything(8735)
-    dataset = DATASETS[dataset_name]
+def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, max_epochs, **model_kwargs):
+    pl.seed_everything(RAND_SEED)
+    dataset = get_dataset(dataset_name, reduce_method)
+    print(dataset.data.x.shape)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Create a PyTorch Lightning trainer
-    experiment_name = f'{dataset_name}-{model_name}'
+    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method)
     root_dir = os.path.join(CHECKPOINT_BASE_PATH, experiment_name)
     os.makedirs(root_dir, exist_ok=True)
     trainer = pl.Trainer(
@@ -52,12 +54,15 @@ def train_node_classifier(model_name, dataset_name, fine_tune, max_epochs, **mod
         print("Found pretrained model, loading to begin fine-tuning")
         model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
     else:
-        pl.seed_everything(8735)
+        pl.seed_everything(RAND_SEED)
         model = NodeLevelGNN(
             model_name=model_name, c_in=dataset.num_node_features, c_out=dataset.num_classes, **model_kwargs
         )
     trainer.fit(model, node_data_loader, node_data_loader)
     model = NodeLevelGNN.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
+
+    saved_best_model_path = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
+    shutil.copy(trainer.checkpoint_callback.best_model_path, saved_best_model_path)
 
     # Test best model on the test set
     test_result = trainer.test(model, test_dataloaders=node_data_loader, verbose=False)
@@ -69,20 +74,21 @@ def train_node_classifier(model_name, dataset_name, fine_tune, max_epochs, **mod
     return model, result
 
 
-def train(dataset_name, model_name, max_epochs=500):
+def train(dataset_name, model_name, reduce_method, max_epochs=500):
     node_mlp_model, node_mlp_result = train_node_classifier(
-        model_name=model_name, dataset_name=dataset_name, fine_tune=True, max_epochs=max_epochs,
-        c_hidden=16, num_layers=2, dp_rate=0.1
+        model_name=model_name, dataset_name=dataset_name, reduce_method=reduce_method, fine_tune=True,
+        max_epochs=max_epochs, c_hidden=16, num_layers=2, dp_rate=0.1
     )
 
-    print(f'\nSemi-supervised node classification results on the {dataset_name} dataset using an {model_name}:')
+    print(f'\nSemi-supervised node classification results on the {dataset_name} dataset using an {model_name}, {reduce_method[0]} {reduce_method[1]}:')
     print_results(node_mlp_result)
 
 
 if __name__ == '__main__':
-    # dataset_name = 'citeseer' # 'cora', 'citeseer',
-    # model_name = 'GCN' # 'MLP', 'GCN', 'GAT', 'GraphConv'
-    # train(dataset_name, model_name, max_epochs=15000)
-    for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
-        for dataset_name in ['cora', 'citeseer']:
-            train(dataset_name, model_name, max_epochs=15000)
+    dataset_name = 'citeseer' # 'cora', 'citeseer',
+    model_name = 'GCN' # 'MLP', 'GCN', 'GAT', 'GraphConv'
+    reduce_method = ('pca', 100)
+    train(dataset_name, model_name, reduce_method, max_epochs=15000)
+    # for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
+    #     for dataset_name in ['cora', 'citeseer']:
+    #         train(dataset_name, model_name, reduced_method max_epochs=15000)

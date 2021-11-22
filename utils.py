@@ -12,6 +12,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import seaborn as sns
 # PyTorch Geometric
+import torch
 import torch_geometric
 # Dimensionality reduction utilities
 import umap
@@ -19,17 +20,33 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 # Project utilities
-from constants import DATASETS, CHECKPOINT_BASE_PATH, RAND_SEED, CLASS_NAMES
+from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, RAND_SEED, CLASS_NAMES
 from models import NodeLevelGNN
 
 
-def extract_hidden_features(dataset_name, model_name, **model_kwargs):
+def get_experiment_name(dataset_name, model_name, reduce_method):
+    return f'{dataset_name}-{model_name}' + f'-{reduce_method[0]}_{reduce_method[1]}' if reduce_method[0] else ''
+
+def get_dataset(dataset_name: str, reduce_method: tuple):
+    """Apply dimensionality reduction to the given PyTorch Geometric dataset, if requested."""
+    if dataset_name == 'cora':
+        dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora')
+    elif dataset_name == 'citeseer':
+        dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer')
+    if reduce_method[0] in ['pca', 'tsne', 'umap']:
+        # Reduce dimensionality of input dataset a priori
+        reduced_x = project_2D(reduce_method[0], dataset.data.x, n_components=reduce_method[1])
+        reduced_x = torch.Tensor(reduced_x)
+        dataset.data.__setattr__('x', reduced_x)
+    return dataset
+
+def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwargs):
     pl.seed_everything(RAND_SEED)
-    dataset = DATASETS[dataset_name]
+    dataset = get_dataset(dataset_name, reduce_method)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Check whether pretrained model exists.
-    experiment_name = f'{dataset_name}-{model_name}'
+    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method)
     pretrained_filename = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
     if os.path.isfile(pretrained_filename):
         print("Found pretrained model, loading...")
@@ -47,10 +64,10 @@ def extract_hidden_features(dataset_name, model_name, **model_kwargs):
 
 def project_2D(method, data, **kwargs):
     if method == 'tsne':
-        tsne = TSNE(n_components=kwargs.get('n_components', 2), init='pca', perplexity=40, random_state=0)
+        tsne = TSNE(n_components=kwargs.get('n_components', 2), init='pca', perplexity=40, random_state=RAND_SEED)
         embedding = tsne.fit_transform(data)
     elif method == 'umap':
-        reducer = umap.UMAP(random_state=8735)
+        reducer = umap.UMAP(n_components=kwargs.get('n_components', 2), random_state=RAND_SEED)
         embedding = reducer.fit_transform(data)
     elif method == 'pca':
         pca = PCA(n_components=kwargs.get('n_components', 2))
@@ -62,9 +79,7 @@ def project_2D(method, data, **kwargs):
 
 def plot_hidden_features(method, data, labels, dataset_name, title, save_path, **kwargs):
     embedding = project_2D(method, data, **kwargs)
-    print('embedding', embedding.shape)
-    # fig = plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path)
-    plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path)
+    fig = plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path)
 
 
 def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
