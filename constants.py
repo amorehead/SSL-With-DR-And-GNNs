@@ -37,3 +37,6 @@ CLASS_NAMES = {
     'cora': ['CB', 'GA', 'NN', 'PM', 'RL', 'RLL', 'Theory'],
     'citeseer': ['Agents', 'AI', 'DB', 'IR', 'ML', 'HCI'],
 }
+
+REDUCE_METHODS = ['pca', 'tsne', 'umap']
+COLOR_PALETTE = ["#52D1DC", "#8D0004", "#845218", "#563EAA", "#E44658", "#63C100", "#FF7800"]

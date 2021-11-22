@@ -20,12 +20,15 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 # Project utilities
-from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, RAND_SEED, CLASS_NAMES
+from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, RAND_SEED, CLASS_NAMES, REDUCE_METHODS, COLOR_PALETTE
 from models import NodeLevelGNN
 
 
 def get_experiment_name(dataset_name, model_name, reduce_method):
-    return f'{dataset_name}-{model_name}' + f'-{reduce_method[0]}_{reduce_method[1]}' if reduce_method[0] else ''
+    exp_name = f'{dataset_name}-{model_name}'
+    if reduce_method[0]:
+        exp_name += f'-{reduce_method[0]}_{reduce_method[1]}'
+    return exp_name
 
 def get_dataset(dataset_name: str, reduce_method: tuple):
     """Apply dimensionality reduction to the given PyTorch Geometric dataset, if requested."""
@@ -33,7 +36,7 @@ def get_dataset(dataset_name: str, reduce_method: tuple):
         dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora')
     elif dataset_name == 'citeseer':
         dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer')
-    if reduce_method[0] in ['pca', 'tsne', 'umap']:
+    if reduce_method[0] in REDUCE_METHODS:
         # Reduce dimensionality of input dataset a priori
         reduced_x = project_2D(reduce_method[0], dataset.data.x, n_components=reduce_method[1])
         reduced_x = torch.Tensor(reduced_x)
@@ -63,14 +66,15 @@ def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwa
 
 
 def project_2D(method, data, **kwargs):
+    n_components = kwargs.get('n_components', 2)
     if method == 'tsne':
-        tsne = TSNE(n_components=kwargs.get('n_components', 2), init='pca', perplexity=40, random_state=RAND_SEED)
+        tsne = TSNE(n_components=n_components, init='pca', perplexity=40, random_state=RAND_SEED)
         embedding = tsne.fit_transform(data)
     elif method == 'umap':
-        reducer = umap.UMAP(n_components=kwargs.get('n_components', 2), random_state=RAND_SEED)
+        reducer = umap.UMAP(n_components=n_components, random_state=RAND_SEED)
         embedding = reducer.fit_transform(data)
     elif method == 'pca':
-        pca = PCA(n_components=kwargs.get('n_components', 2))
+        pca = PCA(n_components=n_components)
         embedding = pca.fit_transform(data)
     else:
         raise ValueError('invalid method', method)
@@ -89,9 +93,7 @@ def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
     v["t1"] = embedding[:, 0]
     v["t2"] = embedding[:, 1]
     num_classes = len(np.unique(labels))
-    palette = sns.color_palette(
-        ["#52D1DC", "#8D0004", "#845218", "#563EAA", "#E44658", "#63C100", "#FF7800"]
-    )[:num_classes]
+    palette = sns.color_palette(COLOR_PALETTE)[:num_classes]
 
     fig, ax = plt.subplots()
     sns.scatterplot(
