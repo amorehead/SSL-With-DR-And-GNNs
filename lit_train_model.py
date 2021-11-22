@@ -10,19 +10,13 @@ import torch_geometric
 # PL callbacks
 from pytorch_lightning.callbacks import ModelCheckpoint
 
+# Project utilities
+from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, DATASETS, AVAIL_GPUS, RAND_SEED
 from models import NodeLevelGNN
 from utils import print_results
 
-AVAIL_GPUS = min(1, torch.cuda.device_count())
-BATCH_SIZE = 256 if AVAIL_GPUS else 64
-# Path to the folder where the datasets are/should be downloaded
-BASE_URL = '.'
-DATASET_PATH = f'{BASE_URL}/data/'
-# Path to the folder where the pretrained models are saved
-CHECKPOINT_BASE_PATH = f'{BASE_URL}/savedmodels/'
-
 # Setting the seed
-pl.seed_everything(8735)
+pl.seed_everything(RAND_SEED)
 
 # Ensure that all operations are deterministic on GPU (if used) for reproducibility
 torch.backends.cudnn.determinstic = True
@@ -32,15 +26,10 @@ torch.backends.cudnn.benchmark = False
 os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 
-datasets = {
-    'cora': torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora'),
-    'citeseer': torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer'),
-}
-
 
 def train_node_classifier(model_name, dataset_name, fine_tune, max_epochs, **model_kwargs):
     pl.seed_everything(8735)
-    dataset = datasets[dataset_name]
+    dataset = DATASETS[dataset_name]
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Create a PyTorch Lightning trainer
@@ -78,28 +67,6 @@ def train_node_classifier(model_name, dataset_name, fine_tune, max_epochs, **mod
     _, val_acc = model.forward(batch, mode="val")
     result = {"train": train_acc, "val": val_acc, "test": test_result[0]["test_acc"]}
     return model, result
-
-
-def extract_hidden_features(dataset_name, model_name, **model_kwargs):
-    pl.seed_everything(8735)
-    dataset = datasets[dataset_name]
-    node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
-
-    # Check whether pretrained model exists.
-    experiment_name = f'{dataset_name}-{model_name}'
-    pretrained_filename = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
-    if os.path.isfile(pretrained_filename):
-        print("Found pretrained model, loading...")
-        model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
-    else:
-        raise IOError("NOT found the pretrained model", pretrained_filename)
-
-    # Test best model on the test set
-    batch = next(iter(node_data_loader))
-    batch = batch.to(model.device)
-    hidden_features = model.extract_features(batch).detach().numpy()
-    labels = batch.y.detach().numpy()
-    return hidden_features, labels
 
 
 def train(dataset_name, model_name, max_epochs=500):

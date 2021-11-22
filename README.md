@@ -1,4 +1,5 @@
 # SSL-With-DR-And-GNNs
+
 Semi-supervised learning with dimensionality reduction and graph neural networks.
 
 ## Setting Up Project via a Traditional Installation (for Linux-Based Operating Systems)
@@ -27,9 +28,11 @@ conda config --set env_prompt '({name})'
 
 ## Running Project after Performing a Traditional Installation (for Linux-Based Operating Systems)
 
-Run like a typical Python script:
+Run like typical Python scripts:
 
 ```bash
-# Run the PyTorch Lightning script:
-python3 ssl_with_dr_and_gnns.py
+# Run the PyTorch Lightning model training script:
+python3 lit_train_model.py
+# Or, plot dimensionality reduction model results
+python3 lit_run_dim_red.py
  ```

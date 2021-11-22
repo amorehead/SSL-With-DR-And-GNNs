@@ -6,8 +6,7 @@ import torch.nn as nn
 # PyTorch Geometric
 import torch_geometric.nn as geom_nn
 
-# Populate list of possible GNN models to use
-gnn_layer_by_name = {"MLP": nn.Linear, "GCN": geom_nn.GCNConv, "GAT": geom_nn.GATConv, "GraphConv": geom_nn.GraphConv}
+from constants import GNN_LAYER_BY_NAME
 
 
 class GNNModel(nn.Module):
@@ -32,7 +31,7 @@ class GNNModel(nn.Module):
             kwargs: Additional arguments for the graph layer (e.g. number of heads for GAT)
         """
         super().__init__()
-        gnn_layer = gnn_layer_by_name[model_name]
+        gnn_layer = GNN_LAYER_BY_NAME[model_name]
 
         hidden_layers = []
         in_channels, out_channels = c_in, c_hidden
