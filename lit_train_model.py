@@ -80,13 +80,14 @@ def train(dataset_name, model_name, reduce_method, max_epochs=500):
         max_epochs=max_epochs, c_hidden=16, num_layers=2, dp_rate=0.1
     )
 
-    print(f'\nSemi-supervised node classification results on the {dataset_name} dataset using an {model_name}, {reduce_method[0]} {reduce_method[1]}:')
+    print(
+        f'\nSemi-supervised node classification results on the {dataset_name} dataset using an {model_name}, {reduce_method[0]} {reduce_method[1]}:')
     print_results(node_mlp_result)
 
 
 if __name__ == '__main__':
-    dataset_name = 'citeseer' # 'cora', 'citeseer',
-    model_name = 'GCN' # 'MLP', 'GCN', 'GAT', 'GraphConv'
+    dataset_name = 'citeseer'  # 'cora', 'citeseer',
+    model_name = 'GCN'  # 'MLP', 'GCN', 'GAT', 'GraphConv'
     reduce_method = ('pca', 100)
     train(dataset_name, model_name, reduce_method, max_epochs=15000)
     # for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
