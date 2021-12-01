@@ -26,9 +26,10 @@ from models import NodeLevelGNN
 
 def get_experiment_name(dataset_name, model_name, reduce_method):
     exp_name = f'{dataset_name}-{model_name}'
-    if reduce_method[0]:
+    if reduce_method[0] and reduce_method[1]:
         exp_name += f'-{reduce_method[0]}_{reduce_method[1]}'
     return exp_name
+
 
 def get_dataset(dataset_name: str, reduce_method: tuple):
     """Apply dimensionality reduction to the given PyTorch Geometric dataset, if requested."""
@@ -42,6 +43,7 @@ def get_dataset(dataset_name: str, reduce_method: tuple):
         reduced_x = torch.Tensor(reduced_x)
         dataset.data.__setattr__('x', reduced_x)
     return dataset
+
 
 def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwargs):
     pl.seed_everything(RAND_SEED)
@@ -138,4 +140,3 @@ def download_pretrained_weights(exist_ok, checkpoint_path, base_url, pretrained_
                     " or contact the author with the full output including the following error:\n",
                     e,
                 )
-
