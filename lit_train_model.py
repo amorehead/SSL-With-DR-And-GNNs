@@ -81,10 +81,10 @@ def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, ma
     return model, result
 
 
-def train(dataset_name, model_name, reduce_method, max_epochs=500):
+def train(dataset_name, model_name, reduce_method, max_epochs=500, learning_rate=1e-1):
     node_mlp_model, node_mlp_result = train_node_classifier(
         model_name=model_name, dataset_name=dataset_name, reduce_method=reduce_method, fine_tune=True,
-        max_epochs=max_epochs, c_hidden=16, num_layers=2, dp_rate=0.1
+        max_epochs=max_epochs, c_hidden=16, num_layers=2, dp_rate=0.1, learning_rate=learning_rate
     )
 
     print(
@@ -95,8 +95,9 @@ def train(dataset_name, model_name, reduce_method, max_epochs=500):
 if __name__ == '__main__':
     dataset_name = 'citeseer'  # 'cora', 'citeseer',
     model_name = 'GCN'  # 'MLP', 'GCN', 'GAT', 'GraphConv'
-    reduce_method = ('pca', 100)
-    train(dataset_name, model_name, reduce_method, max_epochs=100)
+    reduce_method = ('pca', 200)
+    lr = 1e-2 # if transfer_learning else 1e-1
+    train(dataset_name, model_name, reduce_method, max_epochs=5000, learning_rate=lr)
     # for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
     #     for dataset_name in ['cora', 'citeseer']:
     #         train(dataset_name, model_name, reduced_method max_epochs=15000)

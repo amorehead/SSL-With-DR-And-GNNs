@@ -89,6 +89,7 @@ class NodeLevelGNN(pl.LightningModule):
         self.metric_precision = Precision(num_classes=model_kwargs['c_out'], average='macro')
         self.metric_recall = Recall(num_classes=model_kwargs['c_out'], average='macro')
         self.metric_f1 = F1(num_classes=model_kwargs['c_out'], average='macro')
+        self.lr = model_kwargs.get('learning_rate', 1e-1)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
@@ -102,14 +103,12 @@ class NodeLevelGNN(pl.LightningModule):
 
     def configure_optimizers(self):
         # We use SGD here, but Adam works as well
-        transfer_learning = True  # If transfer learning, use a much lower initial learning rate
-        lr = 1e-4 if transfer_learning else 1e-1
-        optimizer = torch.optim.SGD(self.parameters(), lr=lr, momentum=0.9, weight_decay=2e-3)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=2e-3)
         return optimizer
 
     def training_step(self, batch, batch_idx):
         x = self.forward(batch)
-        loss = self.compute_loss(x, batch, mode='train')
+        loss = self.compute_loss(x, batch, 'train')
         acc = self.compute_metric(x, batch, 'train', 'accuracy')
         self.log("train_loss", loss)
         self.log("train_acc", acc)
@@ -117,7 +116,9 @@ class NodeLevelGNN(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x = self.forward(batch)
+        loss = self.compute_loss(x, batch, 'val')
         acc = self.compute_metric(x, batch, 'val', 'accuracy')
+        self.log("val_loss", loss)
         self.log("val_acc", acc)
 
     def test_step(self, batch, batch_idx):
