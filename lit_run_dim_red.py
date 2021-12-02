@@ -43,7 +43,7 @@ if __name__ == '__main__':
     # model_name = 'GCN'
     # reduce_method = ('pca', 10)
     # main(dataset_name, model_name, reduce_method, viz_methods)
-    reduce_method = ('pca', None)  # Generate plots with all possible visualization methods
+    reduce_method = ('', None)  # Generate plots with all possible visualization methods
     for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
         for dataset_name in ['cora', 'citeseer']:
             main(dataset_name, model_name, reduce_method, viz_methods)
