@@ -97,13 +97,21 @@ def train(dataset_name, model_name, reduce_method, fine_tune=False, max_epochs=5
     write_results(dataset_name, model_name, reduce_method, node_mlp_result)
 
 
+def main(dataset_names, model_names):
+    for dataset_name in dataset_names:
+        for model_name in model_names:
+            settings['dataset_name'] = dataset_name
+            settings['model_name'] = model_name
+            train(**settings)
+
+
 if __name__ == '__main__':
-    dataset_name = 'citeseer'  # 'cora', 'citeseer',
-    model_name = 'GCN'  # 'MLP', 'GCN', 'GAT', 'GraphConv'
-    reduce_method = ('', 0)
-    fine_tune = False
-    lr = 1e-1
-    train(dataset_name, model_name, reduce_method, fine_tune=fine_tune, max_epochs=500, learning_rate=lr)
-    # for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
-    #     for dataset_name in ['cora', 'citeseer']:
-    #         train(dataset_name, model_name, reduced_method max_epochs=15000)
+    settings = {
+        'reduce_method': ('pca', 100),
+        'fine_tune': False,
+        'max_epochs': 500,
+        'learning_rate': 1e-1,
+    }
+    dataset_names = ['cora', 'citeseer']
+    model_names = ['MLP', 'GCN', 'GAT', 'GraphConv']
+    main(dataset_names, model_names)

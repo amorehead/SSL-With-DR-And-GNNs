@@ -129,7 +129,7 @@ def write_results(dataset_name, model_name, reduce_method, result_dict):
     t += ',' + f'{test["precision"] * 100:.2f}'
     t += ',' + f'{test["recall"] * 100:.2f}'
     t += ',' + f'{test["f1"] * 100:.2f}'
-    with open(os.path.join(RESULT_DIR, 'test_results.txt'), 'a') as f:
+    with open(os.path.join(RESULT_DIR, 'test_results.csv'), 'a') as f:
         f.write(f'{t}\n')
 
 
