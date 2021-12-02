@@ -29,7 +29,6 @@ os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 
 
 def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, max_epochs, **model_kwargs):
-    pl.seed_everything(RAND_SEED)
     dataset = get_dataset(dataset_name, reduce_method)
     print(dataset.data.x.shape)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
@@ -54,7 +53,6 @@ def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, ma
         print("Found pretrained model, loading to begin fine-tuning")
         model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
     else:
-        pl.seed_everything(RAND_SEED)
         model = NodeLevelGNN(
             model_name=model_name, c_in=dataset.num_node_features, c_out=dataset.num_classes, **model_kwargs
         )
@@ -68,9 +66,18 @@ def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, ma
     test_result = trainer.test(model, test_dataloaders=node_data_loader, verbose=False)
     batch = next(iter(node_data_loader))
     batch = batch.to(model.device)
-    _, train_acc = model.forward(batch, mode="train")
-    _, val_acc = model.forward(batch, mode="val")
-    result = {"train": train_acc, "val": val_acc, "test": test_result[0]["test_acc"]}
+    predicted_y = model.forward(batch)
+
+    result = {
+        "train": {},
+        "val": {},
+        "test": {},
+    }
+    print('test acc', test_result[0]["test_acc"])
+    for set_name in ['train', 'val', 'test']:
+        for metric_name in ['accuracy', 'precision', 'recall', 'f1']:
+            result[set_name][metric_name] = model.compute_metric(predicted_y, batch, set_name, metric_name)
+
     return model, result
 
 
@@ -89,7 +96,7 @@ if __name__ == '__main__':
     dataset_name = 'citeseer'  # 'cora', 'citeseer',
     model_name = 'GCN'  # 'MLP', 'GCN', 'GAT', 'GraphConv'
     reduce_method = ('pca', 100)
-    train(dataset_name, model_name, reduce_method, max_epochs=15000)
+    train(dataset_name, model_name, reduce_method, max_epochs=100)
     # for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
     #     for dataset_name in ['cora', 'citeseer']:
     #         train(dataset_name, model_name, reduced_method max_epochs=15000)

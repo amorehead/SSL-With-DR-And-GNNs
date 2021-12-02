@@ -116,11 +116,9 @@ def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
 
 
 def print_results(result_dict):
-    if "train" in result_dict:
-        print("Train accuracy: %4.2f%%" % (100.0 * result_dict["train"]))
-    if "val" in result_dict:
-        print("Val accuracy:   %4.2f%%" % (100.0 * result_dict["val"]))
-    print("Test accuracy:  %4.2f%%" % (100.0 * result_dict["test"]))
+    for set_name in list(result_dict):
+        for metric_name in list(result_dict[set_name]):
+            print(f'{set_name} {metric_name}: {result_dict[set_name][metric_name] * 100:4.2f}')
 
 
 def download_pretrained_weights(exist_ok, checkpoint_path, base_url, pretrained_files):

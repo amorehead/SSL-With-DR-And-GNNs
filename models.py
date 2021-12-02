@@ -5,6 +5,9 @@ import torch
 import torch.nn as nn
 # PyTorch Geometric
 import torch_geometric.nn as geom_nn
+# TorchMetrics
+import torchmetrics
+from torchmetrics import Precision, Recall, F1
 
 from constants import GNN_LAYER_BY_NAME
 
@@ -79,29 +82,18 @@ class GNNModel(nn.Module):
 class NodeLevelGNN(pl.LightningModule):
     def __init__(self, **model_kwargs):
         super().__init__()
-        # Saving hyperparameters
         self.save_hyperparameters()
 
         self.model = GNNModel(**model_kwargs)
         self.loss_module = nn.CrossEntropyLoss()
+        self.metric_precision = Precision(num_classes=model_kwargs['c_out'], average='macro')
+        self.metric_recall = Recall(num_classes=model_kwargs['c_out'], average='macro')
+        self.metric_f1 = F1(num_classes=model_kwargs['c_out'], average='macro')
 
-    def forward(self, data, mode="train"):
+    def forward(self, data):
         x, edge_index = data.x, data.edge_index
         x = self.model(x, edge_index)
-
-        # Only calculate the loss on the nodes corresponding to the mask
-        if mode == "train":
-            mask = data.train_mask
-        elif mode == "val":
-            mask = data.val_mask
-        elif mode == "test":
-            mask = data.test_mask
-        else:
-            assert False, "Unknown forward mode: %s" % mode
-
-        loss = self.loss_module(x[mask], data.y[mask])
-        acc = (x[mask].argmax(dim=-1) == data.y[mask]).sum().float() / mask.sum()
-        return loss, acc
+        return x
 
     def extract_features(self, data):
         x, edge_index = data.x, data.edge_index
@@ -116,15 +108,49 @@ class NodeLevelGNN(pl.LightningModule):
         return optimizer
 
     def training_step(self, batch, batch_idx):
-        loss, acc = self.forward(batch, mode="train")
+        x = self.forward(batch)
+        loss = self.compute_loss(x, batch, mode='train')
+        acc = self.compute_metric(x, batch, 'train', 'accuracy')
         self.log("train_loss", loss)
         self.log("train_acc", acc)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        _, acc = self.forward(batch, mode="val")
+        x = self.forward(batch)
+        acc = self.compute_metric(x, batch, 'val', 'accuracy')
         self.log("val_acc", acc)
 
     def test_step(self, batch, batch_idx):
-        _, acc = self.forward(batch, mode="test")
+        x = self.forward(batch)
+        acc = self.compute_metric(x, batch, 'test', 'accuracy')
         self.log("test_acc", acc)
+
+    def get_data_mask(self, data, mode):
+        if mode == "train":
+            mask = data.train_mask
+        elif mode == "val":
+            mask = data.val_mask
+        elif mode == "test":
+            mask = data.test_mask
+        else:
+            assert False, "Unknown forward mode: %s" % mode
+        return mask
+
+    def compute_loss(self, x, data, mode):
+        mask = self.get_data_mask(data, mode)
+        loss = self.loss_module(x[mask], data.y[mask])
+        return loss
+
+    def compute_metric(self, x, data, mode, metric_name):
+        mask = self.get_data_mask(data, mode)
+        preds = x[mask].argmax(dim=-1)
+        target = data.y[mask]
+        if metric_name == 'accuracy':
+            metric = torchmetrics.functional.accuracy(preds, target)
+        elif metric_name == 'precision':
+            metric = self.metric_precision(preds, target)
+        elif metric_name == 'recall':
+            metric = self.metric_recall(preds, target)
+        elif metric_name == 'f1':
+            metric = self.metric_f1(preds, target)
+        return metric
