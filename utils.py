@@ -20,7 +20,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 # Project utilities
-from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, RAND_SEED, CLASS_NAMES, REDUCE_METHODS, COLOR_PALETTE
+from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, RAND_SEED, CLASS_NAMES, REDUCE_METHODS, COLOR_PALETTE, RESULT_DIR
 from models import NodeLevelGNN
 
 
@@ -119,6 +119,18 @@ def print_results(result_dict):
     for set_name in list(result_dict):
         for metric_name in list(result_dict[set_name]):
             print(f'{set_name} {metric_name}: {result_dict[set_name][metric_name] * 100:4.2f}')
+
+
+def write_results(dataset_name, model_name, reduce_method, result_dict):
+    test = result_dict['test']
+    t = f'{dataset_name},{model_name}'
+    t += ',' + f'{reduce_method[0]}_{reduce_method[1]}'
+    t += ',' + f'{test["accuracy"] * 100:.2f}'
+    t += ',' + f'{test["precision"] * 100:.2f}'
+    t += ',' + f'{test["recall"] * 100:.2f}'
+    t += ',' + f'{test["f1"] * 100:.2f}'
+    with open(os.path.join(RESULT_DIR, 'test_results.txt'), 'a') as f:
+        f.write(f'{t}\n')
 
 
 def download_pretrained_weights(exist_ok, checkpoint_path, base_url, pretrained_files):

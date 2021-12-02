@@ -14,7 +14,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 # Project utilities
 from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, AVAIL_GPUS, RAND_SEED
 from models import NodeLevelGNN
-from utils import get_experiment_name, get_dataset, print_results
+from utils import get_experiment_name, get_dataset, print_results, write_results
 
 # Setting the seed
 pl.seed_everything(RAND_SEED)
@@ -94,12 +94,13 @@ def train(dataset_name, model_name, reduce_method, fine_tune=False, max_epochs=5
     print(
         f'\nSemi-supervised node classification results on the {dataset_name} dataset using an {model_name}, {reduce_method[0]} {reduce_method[1]}:')
     print_results(node_mlp_result)
+    write_results(dataset_name, model_name, reduce_method, node_mlp_result)
 
 
 if __name__ == '__main__':
     dataset_name = 'citeseer'  # 'cora', 'citeseer',
     model_name = 'GCN'  # 'MLP', 'GCN', 'GAT', 'GraphConv'
-    reduce_method = ('', None)
+    reduce_method = ('', 0)
     fine_tune = False
     lr = 1e-1
     train(dataset_name, model_name, reduce_method, fine_tune=fine_tune, max_epochs=500, learning_rate=lr)
