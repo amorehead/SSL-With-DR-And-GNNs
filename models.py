@@ -80,7 +80,7 @@ class GNNModel(nn.Module):
 
 
 class NodeLevelGNN(pl.LightningModule):
-    def __init__(self, **model_kwargs):
+    def __init__(self, learning_rate, **model_kwargs):
         super().__init__()
         self.save_hyperparameters()
 
@@ -89,7 +89,8 @@ class NodeLevelGNN(pl.LightningModule):
         self.metric_precision = Precision(num_classes=model_kwargs['c_out'], average='macro')
         self.metric_recall = Recall(num_classes=model_kwargs['c_out'], average='macro')
         self.metric_f1 = F1(num_classes=model_kwargs['c_out'], average='macro')
-        self.lr = model_kwargs.get('learning_rate', 1e-1)
+        self.lr = learning_rate
+        print('learning rate =', self.lr)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index

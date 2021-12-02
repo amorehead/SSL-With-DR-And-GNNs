@@ -9,7 +9,7 @@ import torch
 # PyTorch Geometric
 import torch_geometric
 # PL callbacks
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 # Project utilities
 from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, AVAIL_GPUS, RAND_SEED
@@ -28,7 +28,8 @@ os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 
 
-def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, max_epochs, **model_kwargs):
+def train_node_classifier(
+        model_name, dataset_name, reduce_method, fine_tune, max_epochs, learning_rate, **model_kwargs):
     dataset = get_dataset(dataset_name, reduce_method)
     print(dataset.data.x.shape)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
@@ -39,7 +40,10 @@ def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, ma
     os.makedirs(root_dir, exist_ok=True)
     trainer = pl.Trainer(
         default_root_dir=root_dir,
-        callbacks=[ModelCheckpoint(save_weights_only=True, mode="max", monitor="val_acc")],
+        callbacks=[
+            ModelCheckpoint(save_weights_only=True, mode="min", monitor="val_loss"),
+            EarlyStopping('val_loss', patience=5),
+        ],
         gpus=AVAIL_GPUS,
         max_epochs=max_epochs,
         progress_bar_refresh_rate=1
@@ -53,9 +57,8 @@ def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, ma
         print("Found pretrained model, loading to begin fine-tuning")
         model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
     else:
-        model = NodeLevelGNN(
-            model_name=model_name, c_in=dataset.num_node_features, c_out=dataset.num_classes, **model_kwargs
-        )
+        model = NodeLevelGNN(learning_rate=learning_rate, model_name=model_name,
+                             c_in=dataset.num_node_features, c_out=dataset.num_classes, **model_kwargs)
     trainer.fit(model, node_data_loader, node_data_loader)
     model = NodeLevelGNN.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
 
@@ -81,10 +84,11 @@ def train_node_classifier(model_name, dataset_name, reduce_method, fine_tune, ma
     return model, result
 
 
-def train(dataset_name, model_name, reduce_method, max_epochs=500, learning_rate=1e-1):
+def train(dataset_name, model_name, reduce_method, fine_tune=False, max_epochs=500, learning_rate=1e-1):
     node_mlp_model, node_mlp_result = train_node_classifier(
-        model_name=model_name, dataset_name=dataset_name, reduce_method=reduce_method, fine_tune=True,
-        max_epochs=max_epochs, c_hidden=16, num_layers=2, dp_rate=0.1, learning_rate=learning_rate
+        model_name=model_name, dataset_name=dataset_name, reduce_method=reduce_method, fine_tune=fine_tune,
+        max_epochs=max_epochs, learning_rate=learning_rate,
+        c_hidden=16, num_layers=2, dp_rate=0.1
     )
 
     print(
@@ -95,9 +99,10 @@ def train(dataset_name, model_name, reduce_method, max_epochs=500, learning_rate
 if __name__ == '__main__':
     dataset_name = 'citeseer'  # 'cora', 'citeseer',
     model_name = 'GCN'  # 'MLP', 'GCN', 'GAT', 'GraphConv'
-    reduce_method = ('pca', 200)
-    lr = 1e-2 # if transfer_learning else 1e-1
-    train(dataset_name, model_name, reduce_method, max_epochs=5000, learning_rate=lr)
+    reduce_method = ('', None)
+    fine_tune = False
+    lr = 1e-1
+    train(dataset_name, model_name, reduce_method, fine_tune=fine_tune, max_epochs=500, learning_rate=lr)
     # for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
     #     for dataset_name in ['cora', 'citeseer']:
     #         train(dataset_name, model_name, reduced_method max_epochs=15000)
