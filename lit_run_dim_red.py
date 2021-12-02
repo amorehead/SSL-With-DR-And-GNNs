@@ -39,11 +39,7 @@ if __name__ == '__main__':
         'umap': {},
         'pca': {},
     }
-    # dataset_name = 'citeseer'
-    # model_name = 'GCN'
-    # reduce_method = ('pca', 10)
-    # main(dataset_name, model_name, reduce_method, viz_methods)
-    reduce_method = ('', None)  # Generate plots with all possible visualization methods
-    for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
-        for dataset_name in ['cora', 'citeseer']:
+    reduce_method = ('', 0)
+    for dataset_name in ['cora', 'citeseer']:
+        for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
             main(dataset_name, model_name, reduce_method, viz_methods)

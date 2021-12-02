@@ -85,7 +85,7 @@ def project_2D(method, data, **kwargs):
 
 def plot_hidden_features(method, data, labels, dataset_name, title, save_path, **kwargs):
     embedding = project_2D(method, data, **kwargs)
-    fig = plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path)
+    plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path)
 
 
 def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
@@ -112,7 +112,7 @@ def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
     plt.ylabel('')
     plt.title(title)
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    return fig
+    plt.close()
 
 
 def print_results(result_dict):
