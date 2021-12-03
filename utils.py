@@ -19,9 +19,13 @@ import umap
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
+from autoencoder import AutoEncoder
 # Project utilities
-from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, RAND_SEED, CLASS_NAMES, REDUCE_METHODS, COLOR_PALETTE, RESULT_DIR
+from constants import (CHECKPOINT_BASE_PATH, CLASS_NAMES, COLOR_PALETTE,
+                       DATASET_PATH, RAND_SEED, REDUCE_METHODS, RESULT_DIR)
 from models import NodeLevelGNN
+
+os.makedirs(DATASET_PATH, exist_ok=True)
 
 
 def get_experiment_name(dataset_name, model_name, reduce_method):
@@ -31,7 +35,7 @@ def get_experiment_name(dataset_name, model_name, reduce_method):
     return exp_name
 
 
-def get_dataset(dataset_name: str, reduce_method: tuple):
+def get_dataset(dataset_name: str, reduce_method: tuple = ('', 0)):
     """Apply dimensionality reduction to the given PyTorch Geometric dataset, if requested."""
     if dataset_name == 'cora':
         dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Cora')
@@ -39,8 +43,12 @@ def get_dataset(dataset_name: str, reduce_method: tuple):
         dataset = torch_geometric.datasets.Planetoid(root=DATASET_PATH, name='Citeseer')
     if reduce_method[0] in REDUCE_METHODS:
         # Reduce dimensionality of input dataset a priori
-        reduced_x = project_2D(reduce_method[0], dataset.data.x, n_components=reduce_method[1])
-        reduced_x = torch.Tensor(reduced_x)
+        reduced_x = project_nd(
+            reduce_method[0],
+            dataset.data.x,
+            n_components=reduce_method[1],
+            dataset_name=dataset_name)
+        reduced_x = torch.Tensor(reduced_x).detach()
         dataset.data.__setattr__('x', reduced_x)
     return dataset
 
@@ -67,8 +75,9 @@ def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwa
     return hidden_features, labels
 
 
-def project_2D(method, data, **kwargs):
+def project_nd(method, data, **kwargs):
     n_components = kwargs.get('n_components', 2)
+    dataset_name = kwargs.get('dataset_name', '')
     if method == 'tsne':
         tsne = TSNE(n_components=n_components, init='pca', perplexity=40, random_state=RAND_SEED)
         embedding = tsne.fit_transform(data)
@@ -78,13 +87,17 @@ def project_2D(method, data, **kwargs):
     elif method == 'pca':
         pca = PCA(n_components=n_components)
         embedding = pca.fit_transform(data)
+    elif method == 'ae':
+        checkpoint_path = os.path.join(CHECKPOINT_BASE_PATH, f'{dataset_name}-ae-{n_components}.ckpt')
+        ae = AutoEncoder.load_from_checkpoint(checkpoint_path)
+        embedding = ae.encoder(data)
     else:
         raise ValueError('invalid method', method)
     return embedding
 
 
 def plot_hidden_features(method, data, labels, dataset_name, title, save_path, **kwargs):
-    embedding = project_2D(method, data, **kwargs)
+    embedding = project_nd(method, data, **kwargs)
     plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path)
 
 

@@ -12,7 +12,7 @@ import torch_geometric
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 # Project utilities
-from constants import DATASET_PATH, CHECKPOINT_BASE_PATH, AVAIL_GPUS, RAND_SEED
+from constants import CHECKPOINT_BASE_PATH, AVAIL_GPUS, RAND_SEED
 from models import NodeLevelGNN
 from utils import get_experiment_name, get_dataset, print_results, write_results
 
@@ -24,7 +24,6 @@ torch.backends.cudnn.determinstic = True
 torch.backends.cudnn.benchmark = False
 
 # Create checkpoint path if it doesn't exist yet
-os.makedirs(DATASET_PATH, exist_ok=True)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 
 
@@ -107,11 +106,11 @@ def main(dataset_names, model_names):
 
 if __name__ == '__main__':
     settings = {
-        'reduce_method': ('pca', 100),
+        'reduce_method': ('ae', 100),
         'fine_tune': False,
         'max_epochs': 500,
         'learning_rate': 1e-1,
     }
     dataset_names = ['cora', 'citeseer']
-    model_names = ['MLP', 'GCN', 'GAT', 'GraphConv']
+    model_names = ['GCN']
     main(dataset_names, model_names)
