@@ -1,12 +1,13 @@
 import os
 import shutil
 
+import matplotlib.pyplot as plt
 import pytorch_lightning as pl
 import torch_geometric
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 from autoencoder import AutoEncoder
-from constants import AVAIL_GPUS, CHECKPOINT_BASE_PATH, RAND_SEED
+from constants import AVAIL_GPUS, CHECKPOINT_BASE_PATH, RAND_SEED, RESULT_DIR
 from utils import get_dataset
 
 pl.seed_everything(RAND_SEED)
@@ -44,7 +45,35 @@ def train(dataset_name, latent_dim, **kwargs):
     shutil.copy(trainer.checkpoint_callback.best_model_path, saved_best_model_path)
 
 
+def plot_errors(dataset_name, latent_dims):
+    dataset = get_dataset(dataset_name)
+    node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
+
+    errors = []
+    for latent_dim in latent_dims:
+        checkpoint_path = os.path.join(CHECKPOINT_BASE_PATH, f'{dataset_name}-ae-{latent_dim}.ckpt')
+        model = AutoEncoder.load_from_checkpoint(checkpoint_path)
+        num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print('# of params =', num_trainable_params)
+        trainer = pl.Trainer(
+            gpus=AVAIL_GPUS,
+            progress_bar_refresh_rate=1
+        )
+        test_result = trainer.test(model, test_dataloaders=node_data_loader, verbose=False)
+        errors.append(test_result[0]['test_loss_epoch'])
+
+    fig, ax = plt.subplots()
+    ax.plot(latent_dims, errors, 'ko-')
+    ax.set_xticks(latent_dims)
+    ax.set_xlabel('Latent space')
+    ax.set_ylabel('MSE')
+    ae_errors_path = os.path.join(RESULT_DIR, f'{dataset_name}-ae-errors.png')
+    plt.savefig(ae_errors_path, dpi=300, bbox_inches='tight')
+
+
 if __name__ == '__main__':
-    for dataset_name in ['cora', 'citeseer']:
-        for latent_dim in [100]:
+    for dataset_name in ['citeseer']:
+        latent_dims = [10, 100, 250, 500, 1000]
+        for latent_dim in latent_dims:
             train(dataset_name, latent_dim, max_epochs=2500, learning_rate=1e-3)
+        plot_errors(dataset_name, latent_dims)

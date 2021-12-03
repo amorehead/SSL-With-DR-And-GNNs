@@ -70,7 +70,9 @@ def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwa
     # Test best model on the test set
     batch = next(iter(node_data_loader))
     batch = batch.to(model.device)
-    hidden_features = model.extract_features(batch).detach().numpy()
+    model.eval()
+    with torch.no_grad():
+        hidden_features = model.extract_features(batch).detach().numpy()
     labels = batch.y.detach().numpy()
     return hidden_features, labels
 
@@ -90,7 +92,9 @@ def project_nd(method, data, **kwargs):
     elif method == 'ae':
         checkpoint_path = os.path.join(CHECKPOINT_BASE_PATH, f'{dataset_name}-ae-{n_components}.ckpt')
         ae = AutoEncoder.load_from_checkpoint(checkpoint_path)
-        embedding = ae.encoder(data)
+        ae.eval()
+        with torch.no_grad():
+            embedding = ae.encoder(data)
     else:
         raise ValueError('invalid method', method)
     return embedding
