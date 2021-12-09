@@ -20,7 +20,7 @@ from utils import get_experiment_name, get_dataset, print_results, write_results
 pl.seed_everything(RAND_SEED)
 
 # Ensure that all operations are deterministic on GPU (if used) for reproducibility
-torch.backends.cudnn.determinstic = True
+torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 # Create checkpoint path if it doesn't exist yet

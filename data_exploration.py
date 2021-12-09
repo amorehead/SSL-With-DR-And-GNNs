@@ -15,5 +15,6 @@ def display_masks(dataset_name, **model_kwargs):
     print(np.unique(batch.val_mask, return_counts=True))
     print(np.unique(batch.test_mask, return_counts=True))
 
+
 if __name__ == '__main__':
     display_masks('citeseer')
