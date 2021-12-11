@@ -106,11 +106,11 @@ def main(dataset_names, model_names):
 
 if __name__ == '__main__':
     settings = {
-        'reduce_method': ('ae', 100),
+        'reduce_method': ('pca', 100),
         'fine_tune': False,
         'max_epochs': 500,
         'learning_rate': 1e-1,
     }
     dataset_names = ['cora', 'citeseer']
-    model_names = ['GCN']
+    model_names = ['MLP', 'GCN', 'GAT', 'GraphConv']
     main(dataset_names, model_names)
