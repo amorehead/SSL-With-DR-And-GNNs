@@ -34,7 +34,7 @@ def train_node_classifier(
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Create a PyTorch Lightning trainer
-    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method)
+    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method, model_kwargs)
     root_dir = os.path.join(CHECKPOINT_BASE_PATH, experiment_name)
     os.makedirs(root_dir, exist_ok=True)
     trainer = pl.Trainer(
@@ -83,11 +83,11 @@ def train_node_classifier(
     return model, result
 
 
-def train(dataset_name, model_name, reduce_method, fine_tune=False, max_epochs=500, learning_rate=1e-1):
+def train(dataset_name, model_name, reduce_method, fine_tune=False, max_epochs=500, learning_rate=1e-1, c_hidden=16, num_layers=2):
     node_mlp_model, node_mlp_result = train_node_classifier(
         model_name=model_name, dataset_name=dataset_name, reduce_method=reduce_method, fine_tune=fine_tune,
         max_epochs=max_epochs, learning_rate=learning_rate,
-        c_hidden=16, num_layers=2, dp_rate=0.1
+        c_hidden=c_hidden, num_layers=num_layers, dp_rate=0.1
     )
 
     print(
@@ -98,10 +98,12 @@ def train(dataset_name, model_name, reduce_method, fine_tune=False, max_epochs=5
 
 def main(dataset_names, model_names):
     settings = {
-        'reduce_method': ('pca', 100),
+        'reduce_method': ('ae', 100),
         'fine_tune': False,
         'max_epochs': 500,
         'learning_rate': 1e-1,
+        'c_hidden': 64,
+        'num_layers': 2,
     }
     for dataset_name in dataset_names:
         for model_name in model_names:
@@ -113,6 +115,6 @@ def main(dataset_names, model_names):
 
 
 if __name__ == '__main__':
-    dataset_names = ['cora', 'citeseer']
-    model_names = ['MLP', 'GCN', 'GAT', 'GraphConv']
+    dataset_names = ['citeseer']
+    model_names = ['MLP']
     main(dataset_names, model_names)

@@ -28,8 +28,8 @@ from models import NodeLevelGNN
 os.makedirs(DATASET_PATH, exist_ok=True)
 
 
-def get_experiment_name(dataset_name, model_name, reduce_method):
-    exp_name = f'{dataset_name}-{model_name}'
+def get_experiment_name(dataset_name, model_name, reduce_method, model_kwargs):
+    exp_name = f'{dataset_name}-{model_name}-{model_kwargs["c_hidden"]}x{model_kwargs["num_layers"]-1}'
     if reduce_method[0] and reduce_method[1]:
         exp_name += f'-{reduce_method[0]}_{reduce_method[1]}'
     return exp_name
@@ -59,7 +59,7 @@ def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwa
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Check whether pretrained model exists.
-    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method)
+    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method, model_kwargs)
     pretrained_filename = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
     if os.path.isfile(pretrained_filename):
         print("Found pretrained model, loading...")
