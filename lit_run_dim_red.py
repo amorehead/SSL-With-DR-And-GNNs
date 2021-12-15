@@ -1,7 +1,7 @@
 import os
 
 from constants import RESULT_DIR
-from utils import get_experiment_name, extract_hidden_features, plot_hidden_features
+from utils import get_experiment_name, extract_hidden_features, plot_hidden_features, print_number_of_parameters
 
 
 def main(dataset_name, model_name, reduce_method, viz_methods, **kwargs):
@@ -33,13 +33,13 @@ def main(dataset_name, model_name, reduce_method, viz_methods, **kwargs):
 
 if __name__ == '__main__':
     viz_methods = {
-        'tsne': {
-            'n_components': 2,
-        },
-        'umap': {},
         'pca': {},
+        'tsne': {},
+        'umap': {},
+        'isomap': {},
     }
     reduce_method = ('', 0)
     for dataset_name in ['cora', 'citeseer']:
         for model_name in ['MLP', 'GCN', 'GAT', 'GraphConv']:
-            main(dataset_name, model_name, reduce_method, viz_methods)
+            # main(dataset_name, model_name, reduce_method, viz_methods)
+            print_number_of_parameters(dataset_name, model_name, reduce_method)

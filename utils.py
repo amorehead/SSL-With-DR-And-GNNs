@@ -77,6 +77,17 @@ def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwa
     return hidden_features, labels
 
 
+def print_number_of_parameters(dataset_name, model_name, reduce_method):
+    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method)
+    pretrained_filename = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
+    if os.path.isfile(pretrained_filename):
+        model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
+    else:
+        raise IOError("NOT found the pretrained model", pretrained_filename)
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'[{dataset_name}] # of trainable params of {model_name} {reduce_method} = {num_params}')
+
+
 def project_nd(method, data, **kwargs):
     n_components = kwargs.get('n_components', 2)
     dataset_name = kwargs.get('dataset_name', '')
@@ -119,7 +130,7 @@ def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
         x="t1", y="t2",
         hue="label",
         palette=palette,
-        legend='full',
+        legend=None,
         data=v,
         ax=ax,
     )
@@ -127,7 +138,7 @@ def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
     plt.yticks([])
     plt.xlabel('')
     plt.ylabel('')
-    plt.title(title)
+    # plt.title(title)
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close()
 
