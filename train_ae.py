@@ -8,20 +8,21 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 from autoencoder import AutoEncoder
 from constants import AVAIL_GPUS, CHECKPOINT_BASE_PATH, RAND_SEED, RESULT_DIR
-from utils import get_dataset
+from utils import get_dataset, write_ae_error
 
-pl.seed_everything(RAND_SEED)
 os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 
 
-def train(dataset_name, latent_dim, **kwargs):
-    max_epochs = kwargs.get('max_epochs', 500)
-    learning_rate = kwargs.get('learning_rate', 1e-3)
+def train(dataset_name, latent_dim, seed, **model_kwargs):
+    pl.seed_everything(seed)
+
+    max_epochs = model_kwargs.get('max_epochs', 500)
+    learning_rate = model_kwargs.get('learning_rate', 1e-3)
 
     dataset = get_dataset(dataset_name)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
-    experiment_name = f'{dataset_name}-ae-{latent_dim}'
+    experiment_name = f'{dataset_name}-ae-{latent_dim}-seed_{seed}'
     root_dir = os.path.join(CHECKPOINT_BASE_PATH, experiment_name)
     os.makedirs(root_dir, exist_ok=True)
 
@@ -44,6 +45,18 @@ def train(dataset_name, latent_dim, **kwargs):
     saved_best_model_path = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
     shutil.copy(trainer.checkpoint_callback.best_model_path, saved_best_model_path)
 
+    error = compute_test_error(model, node_data_loader)
+    write_ae_error(dataset_name, seed, error)
+
+
+def compute_test_error(model, node_data_loader):
+    trainer = pl.Trainer(
+        gpus=AVAIL_GPUS,
+        progress_bar_refresh_rate=1
+    )
+    test_result = trainer.test(model, test_dataloaders=node_data_loader, verbose=False)
+    return test_result[0]['test_loss_epoch']
+
 
 def plot_errors(dataset_name, latent_dims):
     dataset = get_dataset(dataset_name)
@@ -55,12 +68,8 @@ def plot_errors(dataset_name, latent_dims):
         model = AutoEncoder.load_from_checkpoint(checkpoint_path)
         num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print('# of params =', num_trainable_params)
-        trainer = pl.Trainer(
-            gpus=AVAIL_GPUS,
-            progress_bar_refresh_rate=1
-        )
-        test_result = trainer.test(model, test_dataloaders=node_data_loader, verbose=False)
-        errors.append(test_result[0]['test_loss_epoch'])
+        error = compute_test_error(model, node_data_loader)
+        errors.append(error)
 
     fig, ax = plt.subplots()
     ax.plot(latent_dims, errors, 'ko-')
@@ -72,8 +81,10 @@ def plot_errors(dataset_name, latent_dims):
 
 
 if __name__ == '__main__':
-    for dataset_name in ['citeseer']:
-        latent_dims = [10, 100, 250, 500, 1000]
+    for dataset_name in ['cora', 'citeseer']:
+        latent_dims = [100]
+        seeds = [8735, 2021, 5555, 25, 888]
         for latent_dim in latent_dims:
-            train(dataset_name, latent_dim, max_epochs=2500, learning_rate=1e-3)
-        plot_errors(dataset_name, latent_dims)
+            for seed in seeds:
+                train(dataset_name, latent_dim, max_epochs=2500, learning_rate=1e-3, seed=seed)
+        # plot_errors(dataset_name, latent_dims)

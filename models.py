@@ -38,7 +38,7 @@ class GNNModel(nn.Module):
 
         hidden_layers = []
         in_channels, out_channels = c_in, c_hidden
-        for l_idx in range(num_layers - 1):
+        for l_idx in range(num_layers):
             hidden_layers += [
                 gnn_layer(in_channels, out_channels, **kwargs),
                 nn.ReLU(inplace=True),

@@ -1,6 +1,7 @@
 # Standard libraries
 import os
 import shutil
+from collections import defaultdict
 
 # PyTorch Lightning
 import pytorch_lightning as pl
@@ -14,10 +15,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 # Project utilities
 from constants import CHECKPOINT_BASE_PATH, AVAIL_GPUS, RAND_SEED
 from models import NodeLevelGNN
-from utils import get_experiment_name, get_dataset, print_results, write_results
+from utils import get_experiment_name, get_dataset, print_last_result, write_last_result, write_summary_results
 
-# Setting the seed
-pl.seed_everything(RAND_SEED)
 
 # Ensure that all operations are deterministic on GPU (if used) for reproducibility
 torch.backends.cudnn.deterministic = True
@@ -28,13 +27,15 @@ os.makedirs(CHECKPOINT_BASE_PATH, exist_ok=True)
 
 
 def train_node_classifier(
-        model_name, dataset_name, reduce_method, fine_tune, max_epochs, learning_rate, **model_kwargs):
+        results, model_name, dataset_name, reduce_method, fine_tune, max_epochs, learning_rate, seed, **model_kwargs):
+    pl.seed_everything(seed)
+
     dataset = get_dataset(dataset_name, reduce_method)
     print(dataset.data.x.shape)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Create a PyTorch Lightning trainer
-    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method, model_kwargs)
+    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method, seed, model_kwargs)
     root_dir = os.path.join(CHECKPOINT_BASE_PATH, experiment_name)
     os.makedirs(root_dir, exist_ok=True)
     trainer = pl.Trainer(
@@ -70,51 +71,61 @@ def train_node_classifier(
     batch = batch.to(model.device)
     predicted_y = model.forward(batch)
 
-    result = {
-        "train": {},
-        "val": {},
-        "test": {},
-    }
     print('test acc', test_result[0]["test_acc"])
     for set_name in ['train', 'val', 'test']:
         for metric_name in ['accuracy', 'precision', 'recall', 'f1']:
-            result[set_name][metric_name] = model.compute_metric(predicted_y, batch, set_name, metric_name)
+            metric_value = model.compute_metric(predicted_y, batch, set_name, metric_name)
+            results[set_name][metric_name].append(metric_value)
 
-    return model, result
-
-
-def train(dataset_name, model_name, reduce_method, fine_tune=False, max_epochs=500, learning_rate=1e-1, c_hidden=16, num_layers=2):
-    node_mlp_model, node_mlp_result = train_node_classifier(
-        model_name=model_name, dataset_name=dataset_name, reduce_method=reduce_method, fine_tune=fine_tune,
-        max_epochs=max_epochs, learning_rate=learning_rate,
-        c_hidden=c_hidden, num_layers=num_layers, dp_rate=0.1
-    )
-
-    print(
-        f'\nSemi-supervised node classification results on the {dataset_name} dataset using an {model_name}, {reduce_method[0]} {reduce_method[1]}:')
-    print_results(node_mlp_result)
-    write_results(dataset_name, model_name, reduce_method, node_mlp_result)
+    return results
 
 
-def main(dataset_names, model_names):
-    settings = {
-        'reduce_method': ('ae', 100),
-        'fine_tune': False,
-        'max_epochs': 500,
-        'learning_rate': 1e-1,
-        'c_hidden': 64,
-        'num_layers': 2,
+def train(
+        dataset_name, model_name, reduce_method, fine_tune=False, max_epochs=500, learning_rate=1e-1, c_hidden=16,
+        num_layers=2, seeds=[RAND_SEED]):
+    results = {
+        "train": defaultdict(list),
+        "val": defaultdict(list),
+        "test": defaultdict(list),
     }
-    for dataset_name in dataset_names:
-        for model_name in model_names:
-            settings['dataset_name'] = dataset_name
-            settings['model_name'] = model_name
-            if model_name == 'GraphConv':
-                settings['learning_rate'] = 1e-3
-            train(**settings)
+    for seed in seeds:
+        results = train_node_classifier(
+            results=results, model_name=model_name, dataset_name=dataset_name, reduce_method=reduce_method,
+            fine_tune=fine_tune, max_epochs=max_epochs, learning_rate=learning_rate, seed=seed,
+            c_hidden=c_hidden, num_layers=num_layers, dp_rate=0.1)
+
+        print(
+            f'\nSemi-supervised node classification results on the {dataset_name} dataset using an {model_name}, {reduce_method[0]} {reduce_method[1]}:')
+        print_last_result(results)
+        write_last_result(dataset_name, model_name, reduce_method, seed, results)
+
+    write_summary_results(dataset_name, model_name, reduce_method, seeds, results, res_format='latex')
 
 
 if __name__ == '__main__':
-    dataset_names = ['citeseer']
-    model_names = ['MLP']
-    main(dataset_names, model_names)
+    dataset_names = ['cora', 'citeseer']
+    model_names = ['MLP', 'GCN', 'GAT', 'GraphConv']
+    reduce_methods = [('', 0), ('pca', 100), ('ae', 100)]
+    settings = {
+        'fine_tune': False,
+        'max_epochs': 500,
+        'c_hidden': 64,
+        'seeds': [8735, 2021, 5555, 25, 888],
+    }
+    for dataset_name in dataset_names:
+        for reduce_method in reduce_methods:
+            for model_name in model_names:
+                settings['reduce_method'] = reduce_method
+                settings['dataset_name'] = dataset_name
+                settings['model_name'] = model_name
+                if model_name == 'MLP':
+                    settings['num_layers'] = 1
+                else:
+                    settings['num_layers'] = 1
+
+                if model_name == 'GraphConv':
+                    settings['learning_rate'] = 1e-3
+                else:
+                    settings['learning_rate'] = 1e-1
+
+                train(**settings)

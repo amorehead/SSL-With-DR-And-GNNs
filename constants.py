@@ -26,7 +26,7 @@ BASE_URL = '.'
 DATASET_PATH = f'{BASE_URL}/data/'
 
 # Path to the folder where the pretrained models are saved
-CHECKPOINT_BASE_PATH = f'{BASE_URL}/savedmodels/'
+CHECKPOINT_BASE_PATH = f'{BASE_URL}/savedmodels/five_runs-models/'
 
 # Make results directory
 RESULT_DIR = os.path.join('results')
@@ -39,4 +39,10 @@ CLASS_NAMES = {
 }
 
 REDUCE_METHODS = ['pca', 'tsne', 'umap', 'ae']
+REDUCE_METHOD_READABLE_NAMES = {
+    'pca': 'PCA',
+    'tsne': 't-SNE',
+    'umap': 'UMAP',
+    'ae': 'AE',
+}
 COLOR_PALETTE = ["#52D1DC", "#8D0004", "#845218", "#563EAA", "#E44658", "#63C100", "#FF7800"]

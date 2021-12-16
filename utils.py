@@ -28,10 +28,15 @@ from models import NodeLevelGNN
 os.makedirs(DATASET_PATH, exist_ok=True)
 
 
-def get_experiment_name(dataset_name, model_name, reduce_method, model_kwargs):
-    exp_name = f'{dataset_name}-{model_name}-{model_kwargs["c_hidden"]}x{model_kwargs["num_layers"]-1}'
+def get_experiment_name(dataset_name, model_name, reduce_method, seed, model_kwargs):
+    c_hidden = model_kwargs['c_hidden']
+    num_layers = model_kwargs['num_layers']
+
+    exp_name = f'{dataset_name}-{model_name}-{c_hidden}x{num_layers}'
     if reduce_method[0] and reduce_method[1]:
         exp_name += f'-{reduce_method[0]}_{reduce_method[1]}'
+    if seed is not None:
+        exp_name += f'-seed_{seed}'
     return exp_name
 
 
@@ -53,13 +58,13 @@ def get_dataset(dataset_name: str, reduce_method: tuple = ('', 0)):
     return dataset
 
 
-def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwargs):
+def extract_hidden_features(dataset_name, model_name, reduce_method, seed, **model_kwargs):
     pl.seed_everything(RAND_SEED)
     dataset = get_dataset(dataset_name, reduce_method)
     node_data_loader = torch_geometric.loader.DataLoader(dataset, batch_size=1)
 
     # Check whether pretrained model exists.
-    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method, model_kwargs)
+    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method, seed, model_kwargs)
     pretrained_filename = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
     if os.path.isfile(pretrained_filename):
         print("Found pretrained model, loading...")
@@ -77,8 +82,8 @@ def extract_hidden_features(dataset_name, model_name, reduce_method, **model_kwa
     return hidden_features, labels
 
 
-def print_number_of_parameters(dataset_name, model_name, reduce_method):
-    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method)
+def print_number_of_parameters(dataset_name, model_name, reduce_method, seed, **model_kwargs):
+    experiment_name = get_experiment_name(dataset_name, model_name, reduce_method, seed, model_kwargs)
     pretrained_filename = os.path.join(CHECKPOINT_BASE_PATH, f'{experiment_name}.ckpt')
     if os.path.isfile(pretrained_filename):
         model = NodeLevelGNN.load_from_checkpoint(pretrained_filename)
@@ -91,6 +96,7 @@ def print_number_of_parameters(dataset_name, model_name, reduce_method):
 def project_nd(method, data, **kwargs):
     n_components = kwargs.get('n_components', 2)
     dataset_name = kwargs.get('dataset_name', '')
+    seed = kwargs.get('seed', RAND_SEED)
     if method == 'tsne':
         tsne = TSNE(n_components=n_components, init='pca', perplexity=40, random_state=RAND_SEED)
         embedding = tsne.fit_transform(data)
@@ -101,7 +107,7 @@ def project_nd(method, data, **kwargs):
         pca = PCA(n_components=n_components)
         embedding = pca.fit_transform(data)
     elif method == 'ae':
-        checkpoint_path = os.path.join(CHECKPOINT_BASE_PATH, f'{dataset_name}-ae-{n_components}.ckpt')
+        checkpoint_path = os.path.join(CHECKPOINT_BASE_PATH, f'{dataset_name}-ae-{n_components}-seed_{seed}.ckpt')
         ae = AutoEncoder.load_from_checkpoint(checkpoint_path)
         ae.eval()
         with torch.no_grad():
@@ -111,12 +117,12 @@ def project_nd(method, data, **kwargs):
     return embedding
 
 
-def plot_hidden_features(method, data, labels, dataset_name, title, save_path, **kwargs):
+def plot_hidden_features(ax, method, data, labels, dataset_name, title, save_path, **kwargs):
     embedding = project_nd(method, data, **kwargs)
-    plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path)
+    plot_embedding_2D(ax, data, labels, embedding, dataset_name, title, save_path)
 
 
-def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
+def plot_embedding_2D(ax, data, labels, embedding, dataset_name, title, save_path):
     v = pd.DataFrame(data, columns=[str(i) for i in range(data.shape[1])])
     v['y'] = labels
     v['label'] = v['y'].apply(lambda i: CLASS_NAMES[dataset_name][i])
@@ -125,7 +131,6 @@ def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
     num_classes = len(np.unique(labels))
     palette = sns.color_palette(COLOR_PALETTE)[:num_classes]
 
-    fig, ax = plt.subplots()
     sns.scatterplot(
         x="t1", y="t2",
         hue="label",
@@ -133,31 +138,76 @@ def plot_embedding_2D(data, labels, embedding, dataset_name, title, save_path):
         legend=None,
         data=v,
         ax=ax,
+        size=0,
+        edgecolor=None,
+        linewidth=0,
     )
-    plt.xticks([])
-    plt.yticks([])
-    plt.xlabel('')
-    plt.ylabel('')
-    # plt.title(title)
-    plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    ax.set_aspect(1)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    ax.set_title(title, fontsize=20)
 
 
-def print_results(result_dict):
+def print_last_result(result_dict):
     for set_name in list(result_dict):
         for metric_name in list(result_dict[set_name]):
-            print(f'{set_name} {metric_name}: {result_dict[set_name][metric_name] * 100:4.2f}')
+            print(f'{set_name} {metric_name}: {result_dict[set_name][metric_name][-1] * 100:4.2f}')
 
 
-def write_results(dataset_name, model_name, reduce_method, result_dict):
+def write_last_result(dataset_name, model_name, reduce_method, seed, result_dict):
     test = result_dict['test']
     t = f'{dataset_name},{model_name}'
     t += ',' + f'{reduce_method[0]}_{reduce_method[1]}'
-    t += ',' + f'{test["accuracy"] * 100:.2f}'
-    t += ',' + f'{test["precision"] * 100:.2f}'
-    t += ',' + f'{test["recall"] * 100:.2f}'
-    t += ',' + f'{test["f1"] * 100:.2f}'
-    with open(os.path.join(RESULT_DIR, 'test_results.csv'), 'a') as f:
+    t += ',' + f'{seed}'
+    t += ',' + f'{test["accuracy"][-1] * 100:.2f}'
+    t += ',' + f'{test["precision"][-1] * 100:.2f}'
+    t += ',' + f'{test["recall"][-1] * 100:.2f}'
+    t += ',' + f'{test["f1"][-1] * 100:.2f}'
+    file_path = os.path.join(RESULT_DIR, 'test_results-individuals.csv')
+    with open(file_path, 'a') as f:
+        if os.stat(file_path).st_size == 0:
+            header = f'dataset,model,reduce_method,seed,accuracy,precision,recall,f1\n'
+            f.write(header)
+        f.write(f'{t}\n')
+
+
+def get_mean_std(numbers):
+    mean = np.mean(numbers) * 100
+    std = np.std(numbers) * 100
+    return f'{mean:.2f} ({std:.2f})'
+
+
+def write_summary_results(dataset_name, model_name, reduce_method, seeds, results, res_format='csv'):
+    delimiter = ' & ' if res_format == 'latex' else ','
+
+    seeds_text = '-'.join(map(str, seeds))
+    test = results['test']
+    t = f'{dataset_name}{delimiter}{model_name}'
+    t += delimiter + f'{reduce_method[0]}_{reduce_method[1]}'
+    t += delimiter + f'{seeds}'
+    t += delimiter + get_mean_std(test['accuracy'])
+    t += delimiter + get_mean_std(test['precision'])
+    t += delimiter + get_mean_std(test['recall'])
+    t += delimiter + get_mean_std(test['f1'])
+    file_path = os.path.join(RESULT_DIR, f'test_results-summary.{res_format}')
+    with open(file_path, 'a') as f:
+        if os.stat(file_path).st_size == 0:
+            header = f'dataset{delimiter}model{delimiter}reduce_method{delimiter}seeds{delimiter}accuracy{delimiter}precision{delimiter}recall{delimiter}f1\n'
+            f.write(header)
+        f.write(f'{t}\n')
+
+
+def write_ae_error(dataset_name, seed, error):
+    t = f'{dataset_name}'
+    t += ',' + f'{seed}'
+    t += ',' + f'{error:.4f}'
+    file_path = os.path.join(RESULT_DIR, 'test_results-AEs.csv')
+    with open(file_path, 'a') as f:
+        if os.stat(file_path).st_size == 0:
+            header = f'dataset,seed,error\n'
+            f.write(header)
         f.write(f'{t}\n')
 
 
