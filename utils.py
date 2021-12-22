@@ -98,7 +98,8 @@ def project_nd(method, data, **kwargs):
     dataset_name = kwargs.get('dataset_name', '')
     seed = kwargs.get('seed', RAND_SEED)
     if method == 'tsne':
-        tsne = TSNE(n_components=n_components, init='pca', perplexity=40, random_state=RAND_SEED)
+        tsne_method = 'barnes_hut' if n_components < 4 else 'exact'  # Only supports barnes_hut method while n_comp <= 3
+        tsne = TSNE(n_components=n_components, method=tsne_method, init='pca', perplexity=40, random_state=RAND_SEED)
         embedding = tsne.fit_transform(data)
     elif method == 'umap':
         reducer = umap.UMAP(n_components=n_components, random_state=RAND_SEED)
