@@ -18,8 +18,11 @@ import torch_geometric
 import umap
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-
 from autoencoder import AutoEncoder
+# Cluster validitiy
+from scipy import spatial
+from sklearn.metrics import silhouette_score
+
 # Project utilities
 from constants import (CHECKPOINT_BASE_PATH, CLASS_NAMES, COLOR_PALETTE,
                        DATASET_PATH, RAND_SEED, REDUCE_METHODS, RESULT_DIR)
@@ -117,8 +120,7 @@ def project_nd(method, data, **kwargs):
     return embedding
 
 
-def plot_hidden_features(ax, method, data, labels, dataset_name, title, save_path, **kwargs):
-    embedding = project_nd(method, data, **kwargs)
+def plot_hidden_features(embedding, ax, method, data, labels, dataset_name, title, save_path):
     plot_embedding_2D(ax, data, labels, embedding, dataset_name, title, save_path)
 
 
@@ -228,3 +230,40 @@ def download_pretrained_weights(exist_ok, checkpoint_path, base_url, pretrained_
                     " or contact the author with the full output including the following error:\n",
                     e,
                 )
+
+
+def print_cluster_validities(embedding, labels):
+    si = silhouette_score(embedding, labels)
+    centroids = []
+    for c in np.unique(labels):
+        centroids.append(np.mean(embedding[labels == c], axis=0))
+    di = dunn_index(embedding, labels, centroids)
+    print(f'SI = {si:.3f}, DI = {di:.3f}')
+
+# FROM https://stackoverflow.com/a/60666838/7150241
+# compute the diameter based on convex hull
+
+
+def diameter(pts):
+    # need at least 3 points to construct the convex hull
+    if pts.shape[0] <= 1:
+        return 0
+    if pts.shape[0] == 2:
+        return ((pts[0] - pts[1])**2).sum()
+    # two points which are fruthest apart will occur as vertices of the convex hull
+    hull = spatial.ConvexHull(pts)
+    candidates = pts[spatial.ConvexHull(pts).vertices]
+    return spatial.distance_matrix(candidates, candidates).max()
+
+
+def dunn_index(pts, labels, centroids):
+    # O(k n log(n)) with k clusters and n points; better performance with more even clusters
+    max_intracluster_dist = max(diameter(pts[labels == i]) for i in np.unique(labels))
+    # O(k^2) with k clusters; can be reduced to O(k log(k))
+    # get pairwise distances between centroids
+    cluster_dmat = spatial.distance_matrix(centroids, centroids)
+    # fill diagonal with +inf: ignore zero distance to self in "min" computation
+    np.fill_diagonal(cluster_dmat, np.inf)
+    _, cluster_sizes = np.unique(labels, return_counts=True)
+    min_intercluster_dist = cluster_sizes.min()
+    return min_intercluster_dist / max_intracluster_dist

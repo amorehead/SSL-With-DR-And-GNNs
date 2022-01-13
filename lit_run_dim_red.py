@@ -5,7 +5,8 @@ from matplotlib import rcParams
 
 from constants import RAND_SEED, REDUCE_METHOD_READABLE_NAMES, RESULT_DIR
 from utils import (extract_hidden_features, get_experiment_name,
-                   plot_hidden_features, print_number_of_parameters)
+                   print_cluster_validities, plot_hidden_features, print_number_of_parameters,
+                   project_nd)
 
 rcParams['font.family'] = 'serif'
 rcParams['font.sans-serif'] = ['Times']
@@ -29,8 +30,14 @@ def main(dataset_name, model_name, reduce_method, viz_methods, seed, **model_kwa
         save_dir = os.path.join(RESULT_DIR, dataset_name)
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, plot_name)
-        plot_hidden_features(axs[i], method_name, hidden_features, labels, dataset_name, title, save_path, **kwargs)
+
+        embedding = project_nd(method_name, hidden_features, **kwargs)
+
+        print(f'[{dataset_name}] {reduce_method[0]}{reduce_method[1]} {model_name} {method_name}', end=': ')
+        print_cluster_validities(embedding, labels)
+
         print(f'Visualizing hidden features of the {model_name} on the {dataset_name} dataset: {method_name}')
+        plot_hidden_features(embedding, axs[i], method_name, hidden_features, labels, dataset_name, title, save_path)
 
     experiment_name = get_experiment_name(dataset_name, model_name, reduce_method, None, model_kwargs)
 
@@ -42,9 +49,9 @@ def main(dataset_name, model_name, reduce_method, viz_methods, seed, **model_kwa
         return t
     fig.suptitle(clean_title(experiment_name), fontsize=22)
     figures_path = os.path.join(RESULT_DIR, f'{experiment_name}.png')
-    plt.savefig(figures_path, dpi=300, bbox_inches="tight")
+    plt.savefig(figures_path, dpi=150, bbox_inches="tight")
     figures_path = os.path.join(RESULT_DIR, f'{experiment_name}.pdf')
-    plt.savefig(figures_path, dpi=300, bbox_inches="tight")
+    plt.savefig(figures_path, dpi=150, bbox_inches="tight")
     plt.close()
 
 
