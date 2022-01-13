@@ -105,7 +105,7 @@ def train(
 if __name__ == '__main__':
     dataset_names = ['cora', 'citeseer']
     model_names = ['MLP', 'GCN', 'GAT', 'GraphConv']
-    reduce_methods = [('', 0), ('pca', 100), ('ae', 100)]
+    reduce_methods = [('', 0), ('pca', 100), ('tsne', 100), ('umap', 100), ('ae', 100)]
     settings = {
         'fine_tune': False,
         'max_epochs': 500,
