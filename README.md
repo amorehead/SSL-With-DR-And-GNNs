@@ -36,3 +36,16 @@ python3 lit_train_model.py
 # Or, plot dimensionality reduction model results
 python3 lit_run_dim_red.py
  ```
+
+## Citing this work
+
+If you use the code associated with this repository or otherwise find this work useful, please cite:
+
+```bibtex
+@inproceedings{morehead2023ssl,
+  title={Semi-Supervised Graph Learning Meets Dimensionality Reduction},
+  author={Morehead, Alex and Chantapakul, Watchanan and Cheng, Jianlin},
+  booktitle={IEEE International Conference on Machine Learning and Applications},
+  year={2023}
+}
+```
